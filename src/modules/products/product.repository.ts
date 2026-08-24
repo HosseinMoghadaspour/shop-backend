@@ -1,11 +1,9 @@
-import { getDb } from "../../db/connection.js";
+import { prisma } from "../../lib/prisma.js";
 import type { Product } from "./product.types.js";
 
 export interface ProductFilters {
   search?: string;
   categoryId?: number;
-  brandId?: number;
-  producerId?: number;
   minPrice?: number;
   maxPrice?: number;
   isSpecialSale?: boolean;
@@ -14,188 +12,267 @@ export interface ProductFilters {
   limit: number;
 }
 
-const productSelect = `
-  SELECT
-    RowID,
-    Branch_ID,
-    GoodCategory_ID,
-    Main_MeasureUnit_ID,
-    Default_MeasureUnit_ID,
+/**
+ * فیلدهایی که برای API عمومی محصولات لازم داریم.
+ *
+ * اطلاعات مالی حساس مثل:
+ * - PurchasePrice
+ * - CostOfGood
+ * - ProducerPrice
+ *
+ * عمداً از اینجا خارج شده‌اند.
+ */
+const productSelect = {
+  RowID: true,
+  Branch_ID: true,
 
-    RowCode,
-    RowName,
-    RowNameEN,
-    RowNameAlias,
+  GoodCategory_ID: true,
+  Main_MeasureUnit_ID: true,
+  Default_MeasureUnit_ID: true,
 
-    PurchasePrice,
-    SalePrice,
-    DiscountPrice,
-    ConsumerPrice,
+  RowCode: true,
+  RowName: true,
+  RowNameEN: true,
+  RowNameAlias: true,
 
-    IsActive,
-    RowDesc,
+  SalePrice: true,
+  DiscountPrice: true,
+  ConsumerPrice: true,
 
-    FirstStock,
-    OrderPoint,
+  IsActive: true,
+  RowDesc: true,
 
-    IsHasSize,
-    Warehouse_ID,
+  FirstStock: true,
+  OrderPoint: true,
 
-    Producers_ID,
-    BrandID,
+  IsHasSize: true,
+  Warehouse_ID: true,
 
-    IsShowInOnlineShop,
-    BriefDescription,
-    FullDescription,
+  Producers_ID: true,
+  BrandID: true,
 
-    IsSpecialSale,
-    AmazingSale,
+  IsShowInOnlineShop: true,
 
-    MinOrderSite,
-    MaxOrderSite,
-    MinSiteShow,
+  BriefDescription: true,
+  FullDescription: true,
 
-    width AS Width,
-    height AS Height,
-    Length,
-    Weight,
+  IsSpecialSale: true,
+  AmazingSale: true,
 
-    ShowInCofferMenu,
-    ProfitFromConsumer
+  MinOrderSite: true,
+  MaxOrderSite: true,
+  MinSiteShow: true,
 
-  FROM good
-`;
+  width: true,
+  height: true,
+  Length: true,
+  Weight: true,
 
-function buildProductConditions(
-  request: any,
-  filters: ProductFilters
-) {
-  const conditions: string[] = [
-    "IsActive = 1",
-    "IsShowInOnlineShop = 1"
-  ];
+  ShowInCofferMenu: true,
+  ProfitFromConsumer: true,
 
-  if (filters.search) {
-    conditions.push(`
-      (
-        RowName LIKE @search
-        OR RowCode LIKE @search
-        OR RowNameAlias LIKE @search
-      )
-    `);
+  MDate: true
+} as const;
 
-    request.input("search", `%${filters.search}%`);
-  }
-
-  if (filters.categoryId !== undefined) {
-    conditions.push("GoodCategory_ID = @categoryId");
-    request.input("categoryId", filters.categoryId);
-  }
-
-  if (filters.brandId !== undefined) {
-    conditions.push("BrandID = @brandId");
-    request.input("brandId", filters.brandId);
-  }
-
-  if (filters.producerId !== undefined) {
-    conditions.push("Producers_ID = @producerId");
-    request.input("producerId", filters.producerId);
-  }
-
-  if (filters.minPrice !== undefined) {
-    conditions.push("SalePrice >= @minPrice");
-    request.input("minPrice", filters.minPrice);
-  }
-
-  if (filters.maxPrice !== undefined) {
-    conditions.push("SalePrice <= @maxPrice");
-    request.input("maxPrice", filters.maxPrice);
-  }
-
-  if (filters.isSpecialSale !== undefined) {
-    conditions.push("IsSpecialSale = @isSpecialSale");
-    request.input("isSpecialSale", filters.isSpecialSale);
-  }
-
-  if (filters.amazingSale !== undefined) {
-    conditions.push("AmazingSale = @amazingSale");
-    request.input("amazingSale", filters.amazingSale);
-  }
-
-  return conditions.join(" AND ");
-}
-
-export async function findProducts(filters: ProductFilters) {
-  const db = await getDb();
-  const request = db.request();
-
-  const offset = (filters.page - 1) * filters.limit;
-
-  const where = buildProductConditions(request, filters);
-
-  request.input("offset", offset);
-  request.input("limit", filters.limit);
-
-  const result = await request.query(`
-    ${productSelect}
-
-    WHERE ${where}
-
-    ORDER BY RowID DESC
-
-    OFFSET @offset ROWS
-    FETCH NEXT @limit ROWS ONLY;
-
-    SELECT COUNT(*) AS total
-    FROM good
-    WHERE ${where};
-  `);
-
+/**
+ * شرط عمومی محصولات سایت
+ */
+function buildProductWhere(filters: ProductFilters) {
   return {
-    items: (result.recordsets as unknown as Product[][])[0] as Product[],
-    total: Number(
-      (result.recordsets as unknown as Array<Array<{ total: number }>>)[1][0]
-        .total
-    )
+    IsActive: true,
+
+    // فقط کالاهایی که برای فروشگاه آنلاین فعال هستند
+    IsShowInOnlineShop: true,
+
+    ...(filters.search
+      ? {
+          OR: [
+            {
+              RowName: {
+                contains: filters.search
+              }
+            },
+            {
+              RowCode: {
+                contains: filters.search
+              }
+            },
+            {
+              RowNameAlias: {
+                contains: filters.search
+              }
+            }
+          ]
+        }
+      : {}),
+
+    ...(filters.categoryId !== undefined
+      ? {
+          GoodCategory_ID: filters.categoryId
+        }
+      : {}),
+
+    ...(filters.minPrice !== undefined ||
+    filters.maxPrice !== undefined
+      ? {
+          SalePrice: {
+            ...(filters.minPrice !== undefined
+              ? {
+                  gte: filters.minPrice
+                }
+              : {}),
+
+            ...(filters.maxPrice !== undefined
+              ? {
+                  lte: filters.maxPrice
+                }
+              : {})
+          }
+        }
+      : {}),
+
+    ...(filters.isSpecialSale !== undefined
+      ? {
+          IsSpecialSale: filters.isSpecialSale
+        }
+      : {}),
+
+    ...(filters.amazingSale !== undefined
+      ? {
+          AmazingSale: filters.amazingSale
+        }
+      : {})
   };
 }
 
+/**
+ * لیست محصولات با:
+ * - pagination
+ * - search
+ * - category
+ * - price range
+ * - special sale
+ * - amazing sale
+ */
+export async function findProducts(filters: ProductFilters) {
+  const skip = (filters.page - 1) * filters.limit;
+
+  const where = buildProductWhere(filters);
+
+  const [items, total] = await Promise.all([
+    prisma.good.findMany({
+      where,
+
+      select: productSelect,
+
+      orderBy: {
+        RowID: "desc"
+      },
+
+      skip,
+      take: filters.limit
+    }),
+
+    prisma.good.count({
+      where
+    })
+  ]);
+
+  return {
+    items: items,
+    total
+  };
+}
+
+/**
+ * دریافت یک محصول بر اساس ID
+ */
 export async function findProductById(
   id: number
 ): Promise<Product | null> {
-  const db = await getDb();
+  const product = await prisma.good.findFirst({
+    where: {
+      RowID: id,
+      IsActive: true,
+      IsShowInOnlineShop: true
+    },
 
-  const result = await db
-    .request()
-    .input("id", id)
-    .query(`
-      ${productSelect}
+    select: productSelect
+  });
 
-      WHERE
-        RowID = @id
-        AND IsActive = 1
-        AND IsShowInOnlineShop = 1
-    `);
-
-  return result.recordset[0] ?? null;
+  return product as Product | null;
 }
 
+/**
+ * دریافت محصول بر اساس کد کالا
+ */
 export async function findProductByCode(
   code: string
 ): Promise<Product | null> {
-  const db = await getDb();
+  const product = await prisma.good.findFirst({
+    where: {
+      RowCode: code,
+      IsActive: true,
+      IsShowInOnlineShop: true
+    },
 
-  const result = await db
-    .request()
-    .input("code", code)
-    .query(`
-      ${productSelect}
+    select: productSelect
+  });
 
-      WHERE
-        RowCode = @code
-        AND IsActive = 1
-        AND IsShowInOnlineShop = 1
-    `);
+  return product as Product | null;
+}
 
-  return result.recordset[0] ?? null;
+/**
+ * کالاهای فروش ویژه / شگفت‌انگیز
+ */
+export async function getAmazingProducts(
+  limit = 12
+) {
+  return prisma.good.findMany({
+    where: {
+      IsActive: true,
+      IsShowInOnlineShop: true,
+      AmazingSale: true
+    },
+
+    select: productSelect,
+
+    orderBy: {
+      RowID: "desc"
+    },
+
+    take: limit
+  });
+}
+
+/**
+ * کالاهای جدید
+ */
+export async function getNewProducts(
+  limit = 12
+) {
+  return prisma.good.findMany({
+    where: {
+      IsActive: true,
+      IsShowInOnlineShop: true,
+
+      // فقط کالاهایی که تاریخ ثبت/تغییر دارند
+      MDate: {
+        not: null
+      }
+    },
+
+    select: productSelect,
+
+    orderBy: [
+      {
+        MDate: "desc"
+      },
+      {
+        RowID: "desc"
+      }
+    ],
+
+    take: limit
+  });
 }

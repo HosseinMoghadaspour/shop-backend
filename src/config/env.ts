@@ -19,8 +19,10 @@ export const env = {
     database: required("DB_DATABASE"),
     user: required("DB_USER"),
     password: required("DB_PASSWORD"),
+
     encrypt: process.env.DB_ENCRYPT === "true",
+
     trustServerCertificate:
-      process.env.DB_TRUST_SERVER_CERTIFICATE !== "false"
-  }
+      process.env.DB_TRUST_SERVER_CERTIFICATE !== "false",
+  },
 };

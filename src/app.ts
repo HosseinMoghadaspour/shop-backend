@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { routes } from "./routes/index.js";
+import { errorHandler } from "./shared/errors/error-handler.js";
 
 export const app = new Hono();
 
@@ -16,5 +17,7 @@ app.get("/health", async (c) => {
     message: "OK"
   });
 });
+
+app.onError(errorHandler);
 
 app.route("/api", routes);

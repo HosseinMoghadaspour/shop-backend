@@ -789,3 +789,148 @@ model SiteFooterData {
   @@map("SiteFooterData")
   @@schema("dbo")
 }
+
+
+model Person {
+  RowID                                Int       @id
+  Branch_ID                            Int?
+  Fix_PersonType_ID                    Int?
+  PersonKind_ID                        Int?
+  PersonCategory_ID                    Int?
+  Fix_PersonRemainderType_ID           Int?
+  DiscountGroupPerson_ID               Int?
+
+  RowCode                              String?   @db.NVarChar(50)
+  RowName                              String?   @db.NVarChar(100)
+  PhoneNumber                          String?   @db.NVarChar(200)
+  MobileNumber                         String?   @db.NVarChar(200)
+  FaxNumber                            String?   @db.NVarChar(200)
+  EconomicCode                         String?   @db.NVarChar(200)
+  FatherName                           String?   @db.NVarChar(100)
+  NationalCode                         String?   @db.NVarChar(200)
+  BornLocation                         String?   @db.NVarChar(200)
+
+  AccountNumber1                       String?   @db.NVarChar(50)
+  AccountNumber2                       String?   @db.NVarChar(50)
+  AccountNumber3                       String?   @db.NVarChar(50)
+
+  Postalcode                           String?   @db.NVarChar(200)
+  RegistrationCode                     String?   @db.NVarChar(200)
+  Email                                String?   @db.NVarChar(200)
+  Adress                               String?   @db.NVarChar(500)
+
+  FDate                                String?   @db.Char(10)
+  MDate                                DateTime?
+
+  RemainderTot                         Float?  @db.Money
+  IMG_1                                Bytes?
+
+  IndebtednessRemanence                Decimal?  @db.Decimal(18, 0)
+  IsActive                             Boolean?
+
+  RowDesc                              String?   @db.NVarChar(500)
+
+  InsertedBy                           Int?
+  UpdatedBy                            Int?
+
+  FDateInsert                          String?   @db.Char(10)
+  FDateUpdate                          String?   @db.Char(10)
+  FTimeInsert                          String?   @db.Char(5)
+  FTimeUpdate                          String?   @db.Char(5)
+
+  InsertServerDateTime                 DateTime?
+  UpdateServerDateTime                 DateTime?
+
+  RowUpdateVersion                     Int?
+  UniqueIdentifierValue                String?   @db.UniqueIdentifier
+  ConvertRowID                         String?   @db.NVarChar(100)
+
+  IsSend                               Int?
+
+  MobileForSMS                         String?   @db.NVarChar(11)
+
+  Province_ID                          BigInt?
+  County_ID                            BigInt?
+  City_ID                              BigInt?
+
+  Fix_MarketerPercentType_ID           Int?
+  Fix_MarketerPriceCriterionType_ID    Int?
+
+  PercentPrice                         Float?  @db.Money
+  MarketerPercent                      Float?
+
+  AutomaticSettelAfterSale             Boolean?
+  AutomaticSettelAfterSaleReturn       Boolean?
+
+  OnlinePassword                       String?   @db.NVarChar(50)
+  IsRegisteredOnline                   Boolean?
+
+  BornDay                              Int?
+  BornMonth                            Int?
+  BornYear                             Int?
+
+  City                                 String?   @db.NVarChar(100)
+
+  Fix_Sex_ID                            Int?
+  Company_Type_ID                      Int?
+
+  CreditLimitPrice                     Float?    @db.Money
+  Fix_CreditLimitActionType_ID         Int?
+
+  FDateLastSMS_ForDebt                 String?   @db.Char(10)
+  MDateLastSMS_ForDebt                 DateTime?
+
+  Reversion                            Int?
+  ServerRowID                          Int?
+  ClientRowID                          Int?
+
+  SubscriptionCode                    String?   @db.NVarChar(100)
+
+  BankName1                            String?   @db.NVarChar(300)
+  BankName2                            String?   @db.NVarChar(300)
+  BankName3                            String?   @db.NVarChar(300)
+
+  CreditSelling                        Boolean?
+
+  PercentService                       Float?
+
+  CardPass                             String?   @db.NVarChar(50)
+  EnablePass                           Boolean?
+
+  AgentPercent                         Float?
+
+  AddressShop                          String?   @db.NText
+  NameShop                             String?   @db.NVarChar(250)
+  ActiveCategory                       String?   @db.NVarChar(50)
+
+  Shoppic                              Bytes?
+  Licensepic                           Bytes?
+  Shenasnamehpic                       Bytes?
+  Nationalpic                          Bytes?
+
+  UserName                             String?   @db.NVarChar(250)
+  Passwrod                             String?   @db.NVarChar(250)
+
+  FBornDate                            String?   @db.NVarChar(50)
+  MBornDate                            DateTime?
+
+  ClientVersion                        BigInt?
+
+  HyperPerson                          Boolean?
+  EtebarBestan                         Boolean?
+
+  p1                                  String?   @db.NVarChar(50)
+  p2                                  String?   @db.NVarChar(50)
+  p3                                  String?   @db.NVarChar(50)
+  p4                                  String?   @db.NVarChar(50)
+
+  CarType                              String?   @db.NVarChar(150)
+  CarTypeID                            Int?
+
+  CarWeight                            Float?
+  CarMinWeight                         Float?
+  CarMaxWeight                         Float?
+
+  @@map("Person")
+  @@schema("dbo")
+}

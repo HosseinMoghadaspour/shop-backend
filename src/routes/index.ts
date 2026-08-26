@@ -7,6 +7,7 @@ import { siteModuleRoutes } from "../modules/site-modules/site-module.routes.js"
 import { homepageRoutes } from "../modules/homepage/homepage.routes.js";
 import { categoryRoutes } from "../modules/categories/category.routes.js";
 import { personRoutes } from "../modules/persons/person.routes.js";
+import {userInfoRoutes} from "../modules/userInfo/userInfo.routes.js"
 
 export const routes = new Hono();
 
@@ -24,3 +25,4 @@ routes.route("/site-modules", siteModuleRoutes);
 routes.route("/home", homepageRoutes);
 routes.route("/categories", categoryRoutes);
 routes.route("/persons", personRoutes);
+routes.route("/users" , userInfoRoutes)

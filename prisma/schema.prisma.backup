@@ -1,0 +1,1045 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  schemas  = ["dbo"]
+}
+
+//
+// =========================
+// PRODUCTS / CATALOG
+// =========================
+//
+
+model Good {
+  RowID Int @id
+
+  Branch_ID              Int?
+  GoodCategory_ID        Int?
+  Main_MeasureUnit_ID    Int?
+  Default_MeasureUnit_ID Int?
+
+  Fix_GoodType_ID      Int  @db.TinyInt
+  DiscountGroupGood_ID Int?
+  TaxGroupGood_ID      Int?
+
+  RowCode      String  @db.NVarChar(50)
+  RowName      String  @db.NVarChar(250)
+  RowNameEN    String? @db.NVarChar(250)
+  RowNameAlias String? @db.NVarChar(250)
+
+  PurchasePrice Float  @db.Money
+  SalePrice     Float  @db.Money
+  DiscountPrice Float? @db.Money
+  ConsumerPrice Float? @db.Money
+
+  OrderPoint Float?
+  FirstStock Float?
+
+  IsActive Boolean
+
+  RowDesc String? @db.NVarChar(500)
+
+  InsertedBy Int? @db.SmallInt
+  UpdatedBy  Int? @db.SmallInt
+
+  FDateInsert String? @db.Char(10)
+  FDateUpdate String? @db.Char(10)
+  FTimeInsert String? @db.Char(5)
+  FTimeUpdate String? @db.Char(5)
+
+  InsertServerDateTime DateTime?
+  UpdateServerDateTime DateTime?
+
+  RowUpdateVersion Int? @db.SmallInt
+
+  UniqueIdentifierValue String? @db.UniqueIdentifier
+
+  ConvertRowID   String? @db.NVarChar(100)
+  ConvertRowCode String? @db.NVarChar(100)
+
+  IsSend Int? @db.TinyInt
+
+  PurchasePriceAverage Float? @db.Money
+
+  IsHasSize Boolean?
+
+  Warehouse_ID Int? @db.SmallInt
+
+  FDate String?   @db.Char(10)
+  MDate DateTime?
+
+  GoodNameIndexInPrintInvoice Int? @db.SmallInt
+
+  InterestRate Float?
+
+  Producers_ID BigInt?
+
+  IsShowInOnlineShop Boolean?
+
+  BriefDescription String? @db.NVarChar(4000)
+  FullDescription  String? @db.NVarChar(Max)
+
+  IsSpecialSale Boolean?
+
+  Reversion Int?
+
+  MaxCount Float?
+
+  QuantityInBox String? @db.NVarChar(100)
+
+  CostOfGood Float? @db.Money
+
+  MultipleSalePrice Boolean?
+
+  ServerRowID Int?
+  ClientRowID Int?
+
+  SpecialCategory    Boolean?
+  ShowInStoreInvoice Boolean?
+
+  TransforRate Float? @db.Money
+
+  AmountSaleLimit Float?
+
+  ClientVersion BigInt?
+
+  TaxCode    String?  @db.NVarChar(50)
+  TaxName    String?  @db.NVarChar(250)
+  TaxPercent Decimal? @db.Decimal(18, 3)
+  StatusTax  Int?
+
+  ProducerPrice Float? @db.Money
+  LastPrice     Float? @db.Money
+
+  AmazingSale Boolean?
+
+  MinOrderSite Decimal? @db.Decimal(18, 3)
+  MaxOrderSite Decimal? @db.Decimal(18, 3)
+  MinSiteShow  Decimal? @db.Decimal(18, 3)
+
+  SiteName String? @db.NText
+  Garanti  String? @db.NText
+
+  width  Float?
+  height Float?
+  Length Float?
+  Weight Float?
+
+  BrandID Int?
+
+  ShowInCofferMenu Boolean?
+
+  BarcodeForKalabarg String? @db.NVarChar(50)
+
+  ProfitFromConsumer Float?
+  orderDetails       OrderD[] @relation("GoodOrderDetails")
+
+  @@index([IsActive])
+  @@index([IsShowInOnlineShop])
+  @@index([GoodCategory_ID])
+  @@index([Producers_ID])
+  @@index([BrandID])
+  @@index([RowCode])
+  @@map("Good")
+  @@schema("dbo")
+}
+
+model GoodCategory {
+  RowID Int @id
+
+  Branch_ID       Int?
+  GoodCategory_ID Int?
+
+  RowCode String @db.NVarChar(20)
+  RowName String @db.NVarChar(100)
+
+  IsActive Boolean
+
+  RowDesc String? @db.NVarChar(500)
+
+  InsertedBy Int? @db.SmallInt
+  UpdatedBy  Int? @db.SmallInt
+
+  FDateInsert String? @db.Char(10)
+  FDateUpdate String? @db.Char(10)
+  FTimeInsert String? @db.Char(5)
+  FTimeUpdate String? @db.Char(5)
+
+  InsertServerDateTime DateTime?
+  UpdateServerDateTime DateTime?
+
+  RowUpdateVersion Int? @db.SmallInt
+
+  UniqueIdentifierValue String? @db.UniqueIdentifier
+
+  ConvertRowID String? @db.NVarChar(100)
+
+  IsSend Int? @db.TinyInt
+
+  GoodCategoryMoreInfo String? @db.NVarChar(4000)
+
+  URL String? @db.NVarChar(4000)
+
+  FullRowCode String? @db.NVarChar(4000)
+  FullRowName String? @db.NVarChar(4000)
+
+  IsShowInOnlineShop Boolean?
+
+  RowLevel Int? @db.TinyInt
+
+  Reversion Int?
+
+  ShowInCoffer Boolean?
+
+  ShowOrder Int?
+
+  ShowInAndroid Boolean?
+
+  OnlineCategoryImage String? @db.NText
+
+  @@index([GoodCategory_ID])
+  @@index([IsActive])
+  @@index([IsShowInOnlineShop])
+  @@map("GoodCategory")
+  @@schema("dbo")
+}
+
+model GoodImagesWeb {
+  RowID BigInt @id
+
+  ImageUrl String? @db.NText
+
+  DefaultImage Boolean?
+
+  Alt String? @db.NText
+
+  Good_ID Int?
+
+  @@index([Good_ID])
+  @@index([DefaultImage])
+  @@map("GoodImagesWeb")
+  @@schema("dbo")
+}
+
+model GoodMeasureUnit {
+  RowID Int @id
+
+  Branch_ID Int?
+
+  Good_ID Int
+
+  MeasureUnit_ID Int
+
+  TransformRatio Float
+
+  PurchasePrice Float @db.Money
+  SalePrice     Float @db.Money
+
+  IsActive Boolean
+
+  RowDesc String? @db.NVarChar(500)
+
+  InsertedBy Int? @db.SmallInt
+  UpdatedBy  Int? @db.SmallInt
+
+  FDateInsert String? @db.Char(10)
+  FDateUpdate String? @db.Char(10)
+  FTimeInsert String? @db.Char(5)
+  FTimeUpdate String? @db.Char(5)
+
+  InsertServerDateTime DateTime?
+  UpdateServerDateTime DateTime?
+
+  RowUpdateVersion Int? @db.SmallInt
+
+  UniqueIdentifierValue String? @db.UniqueIdentifier
+
+  IsSend Int? @db.TinyInt
+
+  ServerRowID Int?
+  Reversion   Int?
+  ClientRowID Int?
+
+  ConsumerPrice Float? @db.Money
+  LastPrice     Float? @db.Money
+
+  @@index([Good_ID])
+  @@index([MeasureUnit_ID])
+  @@index([IsActive])
+  @@map("GoodMeasureUnit")
+  @@schema("dbo")
+}
+
+model MeasureUnit {
+  RowID Int @id
+
+  Branch_ID Int?
+
+  RowName String @db.NVarChar(100)
+
+  DefinedBySystem Boolean
+
+  IsActive Boolean
+
+  RowDesc String? @db.NVarChar(500)
+
+  InsertedBy Int? @db.SmallInt
+  UpdatedBy  Int? @db.SmallInt
+
+  FDateInsert String? @db.Char(10)
+  FDateUpdate String? @db.Char(10)
+  FTimeInsert String? @db.Char(5)
+  FTimeUpdate String? @db.Char(5)
+
+  InsertServerDateTime DateTime?
+  UpdateServerDateTime DateTime?
+
+  RowUpdateVersion Int? @db.SmallInt
+
+  UniqueIdentifierValue String? @db.UniqueIdentifier
+
+  IsSend Int? @db.TinyInt
+
+  ServerRowID Int?
+  Reversion   Int?
+  ClientRowID Int?
+
+  WeightOrAmount Int? @db.TinyInt
+
+  TaxCode String? @db.NVarChar(50)
+
+  @@index([IsActive])
+  @@map("MeasureUnit")
+  @@schema("dbo")
+}
+
+model Producers {
+  RowID   BigInt @id
+  RowName String @db.NVarChar(100)
+
+  ProducerImage Bytes? @db.Image
+
+  BriefDescription String? @db.NVarChar(4000)
+  FullDescription  String? @db.NVarChar(4000)
+
+  IsActive Boolean
+  RowDesc  String? @db.NVarChar(500)
+
+  InsertedBy Int? @db.SmallInt
+  UpdatedBy  Int? @db.SmallInt
+
+  FDateInsert String? @db.Char(10)
+  FDateUpdate String? @db.Char(10)
+  FTimeInsert String? @db.Char(5)
+  FTimeUpdate String? @db.Char(5)
+
+  InsertServerDateTime DateTime?
+  UpdateServerDateTime DateTime?
+
+  RowUpdateVersion Int? @db.SmallInt
+
+  UniqueIdentifierValue String?
+
+  Reversion BigInt?
+
+  @@index([IsActive])
+  @@index([RowName])
+  @@map("Producers")
+  @@schema("dbo")
+}
+
+//
+// =========================
+// PRICES
+// =========================
+//
+
+model SalePriceType {
+  RowID BigInt @id
+
+  RowName String @db.NVarChar(100)
+
+  IsActive Boolean
+
+  RowDesc String? @db.NVarChar(500)
+
+  InsertedBy Int? @db.SmallInt
+  UpdatedBy  Int? @db.SmallInt
+
+  FDateInsert String? @db.Char(10)
+  FDateUpdate String? @db.Char(10)
+
+  FTimeInsert String? @db.Char(5)
+  FTimeUpdate String? @db.Char(5)
+
+  InsertServerDateTime DateTime?
+  UpdateServerDateTime DateTime?
+
+  RowUpdateVersion Int? @db.SmallInt
+
+  UniqueIdentifierValue String?
+
+  Reversion BigInt?
+
+  BranchID Int?
+
+  @@index([IsActive])
+  @@index([BranchID])
+  @@map("SalePriceType")
+  @@schema("dbo")
+}
+
+model GoodSalePrice {
+  RowID Int @id
+
+  Good_ID Int
+
+  SalePriceType_ID BigInt
+
+  SalePrice Float? @db.Money
+
+  RowDesc String? @db.NVarChar(500)
+
+  UniqueIdentifierValue String?
+
+  ConsumerPrice Float? @db.Money
+
+  Reversion Int?
+
+  @@index([Good_ID])
+  @@index([SalePriceType_ID])
+  @@map("GoodSalePrice")
+  @@schema("dbo")
+}
+
+model GoodBranchPrice {
+  RowID BigInt @id
+
+  GID Int?
+
+  BID Int?
+
+  SalePrice     Float? @db.Money
+  ConsumerPrice Float? @db.Money
+  BuyPrice      Float? @db.Money
+
+  Fdate String? @db.NVarChar(50)
+
+  Mdate DateTime?
+
+  @@index([GID])
+  @@index([BID])
+  @@map("GoodBranchPrice")
+  @@schema("dbo")
+}
+
+model Branch {
+  RowID Int @id
+
+  RowCode BigInt
+
+  RowName String @db.NVarChar(100)
+
+  IsActive Boolean
+
+  RowDesc String? @db.NVarChar(500)
+
+  UniqueIdentifierValue String?
+
+  Reversion Int?
+
+  ServerID Int?
+  ClientID Int?
+
+  Warehouse_ID Int?
+
+  MainBranch Boolean?
+
+  ApiKey String? @db.NText
+
+  AdminName String? @db.NVarChar(500)
+
+  Address String? @db.NText
+
+  Franchize Boolean?
+
+  AdminTel String? @db.NVarChar(50)
+
+  @@index([IsActive])
+  @@index([MainBranch])
+  @@map("Branch")
+  @@schema("dbo")
+}
+
+model Warehouse {
+  RowID Int @id @db.SmallInt
+
+  Branch_ID Int?
+
+  RowName String @db.NVarChar(100)
+
+  IsActive Boolean
+
+  RowDesc String? @db.NVarChar(500)
+
+  UniqueIdentifierValue String?
+
+  IsSend Int? @db.TinyInt
+
+  Reversion Int?
+
+  Type Boolean?
+
+  BranchID Int?
+
+  RequestMinus Boolean?
+
+  RequestCheckReserve Boolean?
+
+  @@index([Branch_ID])
+  @@index([BranchID])
+  @@index([IsActive])
+  @@map("Warehouse")
+  @@schema("dbo")
+}
+
+//
+// =========================
+// ORDERS
+// =========================
+//
+
+model OrderH {
+  RowID BigInt @id
+
+  Branch_ID Int?
+
+  FinancialYear_ID Int @db.SmallInt
+
+  Fix_RecordStatusType_ID Int @db.TinyInt
+
+  Fix_DiscountType_ID Int? @db.TinyInt
+
+  Person_ID Int?
+
+  DocNo BigInt
+
+  FDate String @db.Char(10)
+
+  MDate DateTime?
+
+  DiscountPercent Float?
+
+  DiscountPrice Float? @db.Money
+
+  TaxPercent Float?
+
+  TaxPrice Float? @db.Money
+
+  TotalPrice Float? @db.Money
+
+  QuantityInUnitPrice Float? @db.Money
+
+  TotalDiscountPriceItems Float? @db.Money
+
+  TotalTaxPriceItems Float? @db.Money
+
+  TotalIncreasePrice Float? @db.Money
+
+  TotalDecreasePrice Float? @db.Money
+
+  ShippingCost Float? @db.Money
+
+  PayablePrice Float? @db.Money
+
+  ReferenceValue String? @db.NVarChar(500)
+
+  DefinedBySystem Boolean
+
+  IsOnlineOrder Boolean?
+
+  Conditions String? @db.NVarChar(Max)
+
+  ExpirationDays String? @db.Char(10)
+
+  ExpirationDate String? @db.Char(10)
+
+  RowDesc String? @db.NVarChar(500)
+
+  InsertedBy Int? @db.SmallInt
+  UpdatedBy  Int? @db.SmallInt
+
+  FDateInsert String? @db.Char(10)
+  FDateUpdate String? @db.Char(10)
+
+  FTimeInsert String? @db.Char(5)
+  FTimeUpdate String? @db.Char(5)
+
+  InsertServerDateTime DateTime?
+  UpdateServerDateTime DateTime?
+
+  RowUpdateVersion Int? @db.SmallInt
+
+  UniqueIdentifierValue String?
+
+  IsSend Int? @db.TinyInt
+
+  OrderDeliveryAddress_ID BigInt?
+
+  Fix_OrderPaymentMethod_ID Int? @db.TinyInt
+
+  DepositTrackingNumber String? @db.NVarChar(250)
+  DepositAmount         Float?  @db.Money
+
+  DepositYear   String? @db.NVarChar(4)
+  DepositMonth  String? @db.NVarChar(2)
+  DepositDay    String? @db.NVarChar(2)
+  DepositHour   String? @db.NVarChar(2)
+  DepositMinute String? @db.NVarChar(2)
+
+  DepositLastFourDigitsOfCreditCard String? @db.NVarChar(4)
+
+  PaymentConfirmationFDate String? @db.Char(10)
+  PaymentConfirmationFtime String? @db.Char(5)
+
+  PaymentConfirmationAmount Float? @db.Money
+
+  PaymentConfirmationBankAccount_ID Int?
+  PaymentConfirmationCoffer_ID      Int?
+
+  Fix_OrderPaymentConfirmationStatus_ID Int? @db.TinyInt
+
+  Fix_OrderDeliveryStatus_ID Int? @db.TinyInt
+
+  IsWebUserCanEditRecord Boolean?
+
+  IsWebUserCanSeeRecord Boolean?
+
+  DepositBankAccount_ID Int?
+
+  Fix_OrderSendID Int?
+
+  OrderStatus Boolean?
+
+  orderDetails OrderD[] @relation("OrderDetails")
+
+  @@index([IsOnlineOrder])
+  @@index([Person_ID])
+  @@index([Branch_ID])
+  @@index([MDate])
+  @@map("OrderH")
+  @@schema("dbo")
+}
+
+model OrderD {
+  RowID BigInt @id
+
+  Branch_ID Int?
+
+  FinancialYear_ID Int @db.SmallInt
+
+  OrderH_ID BigInt
+
+  Good_ID Int
+
+  MeasureUnit_ID      Int?
+  Main_MeasureUnit_ID Int?
+
+  Fix_DiscountType_ID Int? @db.TinyInt
+
+  InputValue Float
+
+  CalculatedInputValue Float
+
+  OutputValue Float
+
+  CalculatedOutputValue Float
+
+  UnitPrice Float @db.Money
+
+  TotalPrice Float @db.Money
+
+  QuantityInUnitPrice Float? @db.Money
+
+  DiscountPercent Float?
+
+  DiscountPrice Float? @db.Money
+
+  PurchaseUnitPrice Float? @db.Money
+
+  PurchaseTotalPrice Float? @db.Money
+
+  PurchaseTotalPriceAverage Float? @db.Money
+
+  TaxPercent Float?
+
+  TaxPrice Float? @db.Money
+
+  SaleUnitPrice Float? @db.Money
+
+  RowDesc String? @db.NVarChar(500)
+
+  UniqueIdentifierValue String?
+
+  IsSend Int? @db.TinyInt
+
+  order OrderH @relation("OrderDetails", fields: [OrderH_ID], references: [RowID])
+  good  Good   @relation("GoodOrderDetails", fields: [Good_ID], references: [RowID])
+
+  @@index([OrderH_ID])
+  @@index([Good_ID])
+  @@index([Branch_ID])
+  @@map("OrderD")
+  @@schema("dbo")
+}
+
+//
+// =========================
+// WEBSITE
+// =========================
+//
+
+model SiteModuleOrder {
+  RowID Int @id
+
+  Name String? @db.NVarChar(50)
+
+  ISActive Boolean?
+
+  SortOrder Int?
+
+  @@index([ISActive])
+  @@index([SortOrder])
+  @@map("SiteModuleOrder")
+  @@schema("dbo")
+}
+
+model SiteSlider {
+  RowID BigInt @id
+
+  UrlImage String? @db.NText
+
+  DescImage String? @db.NVarChar(Max)
+
+  DescBut String? @db.NVarChar(100)
+
+  UrlSend String? @db.NText
+
+  Status Boolean?
+
+  Type Int?
+
+  Description String? @db.NText
+
+  @@index([Status])
+  @@index([Type])
+  @@map("SiteSlider")
+  @@schema("dbo")
+}
+
+model SiteFooterData {
+  RowID Int @id
+
+  AboutText String? @db.NText
+
+  Address String? @db.NText
+
+  Phone1 String? @db.NVarChar(50)
+
+  Phone2 String? @db.NVarChar(50)
+
+  InstagramHandle String? @db.NText
+
+  TelegramHandle String? @db.NText
+
+  WhatsAppHandle String? @db.NText
+
+  EtaHandle String? @db.NText
+
+  Rubikahandle String? @db.NText
+
+  LogoImageUrl String? @db.NText
+
+  EnamadImageUrl String? @db.NText
+
+  ReziImageUrl String? @db.NText
+
+  SamandehiUrl String? @db.NText
+
+  DragahUrl String? @db.NText
+
+  LinkContactUs String? @db.NText
+
+  LinkAboutUs String? @db.NText
+
+  LinkFAQ String? @db.NText
+
+  LinkArticles String? @db.NText
+
+  Copyright String? @db.NText
+
+  SiteIcon String? @db.NText
+
+  SiteName String? @db.NVarChar(50)
+
+  @@map("SiteFooterData")
+  @@schema("dbo")
+}
+
+//
+// =========================
+// AUTH / BETTER AUTH
+// =========================
+//
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  personId Int?    @unique
+  person   Person? @relation(fields: [personId], references: [RowID])
+
+  sessions Session[]
+  accounts Account[]
+
+  @@schema("dbo")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@schema("dbo")
+}
+
+model Account {
+  id         String @id
+  accountId  String
+  providerId String
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("dbo")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@schema("dbo")
+}
+
+//
+// =========================
+// PERSON / LEGACY USERS
+// =========================
+//
+
+model Person {
+  RowID                      Int  @id
+  Branch_ID                  Int?
+  Fix_PersonType_ID          Int?
+  PersonKind_ID              Int?
+  PersonCategory_ID          Int?
+  Fix_PersonRemainderType_ID Int?
+  DiscountGroupPerson_ID     Int?
+
+  RowCode      String? @db.NVarChar(50)
+  RowName      String? @db.NVarChar(100)
+  PhoneNumber  String? @db.NVarChar(200)
+  MobileNumber String? @db.NVarChar(200)
+  FaxNumber    String? @db.NVarChar(200)
+  EconomicCode String? @db.NVarChar(200)
+  FatherName   String? @db.NVarChar(100)
+  NationalCode String? @db.NVarChar(200)
+  BornLocation String? @db.NVarChar(200)
+
+  AccountNumber1 String? @db.NVarChar(50)
+  AccountNumber2 String? @db.NVarChar(50)
+  AccountNumber3 String? @db.NVarChar(50)
+
+  Postalcode       String? @db.NVarChar(200)
+  RegistrationCode String? @db.NVarChar(200)
+  Email            String? @db.NVarChar(200)
+  Adress           String? @db.NVarChar(500)
+
+  FDate String?   @db.Char(10)
+  MDate DateTime?
+
+  RemainderTot Float? @db.Money
+  IMG_1        Bytes?
+
+  IndebtednessRemanence Decimal? @db.Decimal(18, 0)
+  IsActive              Boolean?
+
+  RowDesc String? @db.NVarChar(500)
+
+  InsertedBy Int?
+  UpdatedBy  Int?
+
+  FDateInsert String? @db.Char(10)
+  FDateUpdate String? @db.Char(10)
+  FTimeInsert String? @db.Char(5)
+  FTimeUpdate String? @db.Char(5)
+
+  InsertServerDateTime DateTime?
+  UpdateServerDateTime DateTime?
+
+  RowUpdateVersion      Int?
+  UniqueIdentifierValue String? @db.UniqueIdentifier
+  ConvertRowID          String? @db.NVarChar(100)
+
+  IsSend Int?
+
+  MobileForSMS String? @db.NVarChar(11)
+
+  Province_ID BigInt?
+  County_ID   BigInt?
+  City_ID     BigInt?
+
+  Fix_MarketerPercentType_ID        Int?
+  Fix_MarketerPriceCriterionType_ID Int?
+
+  PercentPrice    Float? @db.Money
+  MarketerPercent Float?
+
+  AutomaticSettelAfterSale       Boolean?
+  AutomaticSettelAfterSaleReturn Boolean?
+
+  OnlinePassword     String?  @db.NVarChar(50)
+  IsRegisteredOnline Boolean?
+
+  BornDay   Int?
+  BornMonth Int?
+  BornYear  Int?
+
+  City String? @db.NVarChar(100)
+
+  Fix_Sex_ID      Int?
+  Company_Type_ID Int?
+
+  CreditLimitPrice             Float? @db.Money
+  Fix_CreditLimitActionType_ID Int?
+
+  FDateLastSMS_ForDebt String?   @db.Char(10)
+  MDateLastSMS_ForDebt DateTime?
+
+  Reversion   Int?
+  ServerRowID Int?
+  ClientRowID Int?
+
+  SubscriptionCode String? @db.NVarChar(100)
+
+  BankName1 String? @db.NVarChar(300)
+  BankName2 String? @db.NVarChar(300)
+  BankName3 String? @db.NVarChar(300)
+
+  CreditSelling Boolean?
+
+  PercentService Float?
+
+  CardPass   String?  @db.NVarChar(50)
+  EnablePass Boolean?
+
+  AgentPercent Float?
+
+  AddressShop    String? @db.NText
+  NameShop       String? @db.NVarChar(250)
+  ActiveCategory String? @db.NVarChar(50)
+
+  Shoppic        Bytes?
+  Licensepic     Bytes?
+  Shenasnamehpic Bytes?
+  Nationalpic    Bytes?
+
+  UserName String? @db.NVarChar(250)
+  Passwrod String? @db.NVarChar(250)
+
+  FBornDate String?   @db.NVarChar(50)
+  MBornDate DateTime?
+
+  ClientVersion BigInt?
+
+  HyperPerson  Boolean?
+  EtebarBestan Boolean?
+
+  p1 String? @db.NVarChar(50)
+  p2 String? @db.NVarChar(50)
+  p3 String? @db.NVarChar(50)
+  p4 String? @db.NVarChar(50)
+
+  CarType   String? @db.NVarChar(150)
+  CarTypeID Int?
+
+  CarWeight    Float?
+  CarMinWeight Float?
+  CarMaxWeight Float?
+
+  authUser User?
+
+  @@map("Person")
+  @@schema("dbo")
+}
+
+model UserInfo {
+  RowID                 Int       @id @db.SmallInt
+  RowName               String?   @db.NVarChar(100)
+  UserLoginName         String?   @db.NVarChar(50)
+  UserLoginPassword     String?   @db.NVarChar(50)
+  UserPermits_Menues    String?   @db.NVarChar(400)
+  UserPermits_INSERT    String?   @db.NVarChar(400)
+  UserPermits_UPDATE    String?   @db.NVarChar(400)
+  UserPermits_DELETE    String?   @db.NVarChar(400)
+  UserPermits_Special   String?   @db.NVarChar(400)
+  NationalCode          String?   @db.NVarChar(200)
+  FatherName            String?   @db.NVarChar(100)
+  Mobile                String?   @db.NVarChar(200)
+  Phone                 String?   @db.NVarChar(200)
+  Address               String?   @db.NVarChar(500)
+  FDate                 String?   @db.Char(10)
+  Mdate                 DateTime? @db.DateTime
+  IsAdmin               Boolean   @db.Bit
+  IsActive              Boolean   @db.Bit
+  RowDesc               String?   @db.NVarChar(500)
+  UniqueIdentifierValue String?   @db.UniqueIdentifier
+  Reversion             Int?
+  IsCashier             Boolean   @db.Bit
+  ServerRowID           Int?      @db.SmallInt
+  ClientRowID           Int?      @db.SmallInt
+  BranchID              Int?
+  AdminSite             Boolean   @db.Bit
+
+  @@map("UserInfo")
+  @@schema("dbo")
+}

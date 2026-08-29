@@ -1,5 +1,5 @@
 import { PrismaMssql } from "@prisma/adapter-mssql";
-import { PrismaClient } from "../generated/prisma/client.js";
+import { PrismaClient } from "../generated/auth-prisma/client.js";
 
 import { env } from "../config/env.js";
 
@@ -8,13 +8,11 @@ const adapter = new PrismaMssql({
   database: env.database.database,
   user: env.database.user,
   password: env.database.password,
-
   options: {
     instanceName: env.database.instanceName,
     encrypt: env.database.encrypt,
     trustServerCertificate: env.database.trustServerCertificate,
   },
-
   pool: {
     max: 10,
     min: 0,
@@ -22,7 +20,4 @@ const adapter = new PrismaMssql({
   },
 });
 
-export const prisma = new PrismaClient({
-  adapter,
-});
-
+export const authPrisma = new PrismaClient({ adapter });

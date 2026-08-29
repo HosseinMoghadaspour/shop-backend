@@ -20,4 +20,4 @@ app.get("/health", async (c) => {
 
 app.onError(errorHandler);
 
-app.route("/api", routes);
+app.route("/", routes);

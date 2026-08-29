@@ -34,3 +34,9 @@ lerna-debug.log*
 .windsurf
 
 /dist
+
+/generated
+
+auth-schema.prisma
+
+schema.prisma

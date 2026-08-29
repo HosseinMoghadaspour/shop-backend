@@ -20,11 +20,12 @@ import { AppError } from "../../shared/errors/app-error.js";
 
 function toJsonSafe<T>(value: T): T {
   return JSON.parse(
-    JSON.stringify(value, (_key, nestedValue) =>
-      typeof nestedValue === "bigint"
+    JSON.stringify(value, (key, nestedValue) => {
+      if (["Passwrod", "OnlinePassword"].includes(key)) return undefined;
+      return typeof nestedValue === "bigint"
         ? nestedValue.toString()
-        : nestedValue,
-    ),
+        : nestedValue;
+    }),
   ) as T;
 }
 

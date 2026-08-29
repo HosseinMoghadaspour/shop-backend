@@ -1,0 +1,1 @@
+-- Superseded by 20260829140000_replace_better_auth.

@@ -1,4 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
+import { Prisma } from "../../generated/prisma/client.js";
 import type {
   CreatePersonInput,
   UpdatePersonInput,
@@ -117,7 +118,7 @@ export async function findByCode(code: string) {
 
 export async function create(data: CreatePersonInput) {
   return prisma.person.create({
-    data,
+    data: data as Prisma.PersonUncheckedCreateInput,
   });
 }
 

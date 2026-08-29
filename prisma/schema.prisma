@@ -1,6 +1,6 @@
 generator clientLegacy {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -708,68 +708,34 @@ model SiteFooterData {
   @@schema("dbo")
 }
 
-model AuthUser {
-  id            String         @id
-  name          String
-  email         String         @unique
-  emailVerified Boolean        @default(false)
-  image         String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  personId      Int?
-  accounts      AuthAccount[]
-  sessions      SessionModel[]
-  person        Person?        @relation(fields: [personId], references: [RowID], onDelete: NoAction, onUpdate: NoAction)
+model CustomOtpCode {
+  id          String    @id
+  phoneNumber String    @db.NVarChar(30)
+  codeHash    String    @db.NVarChar(128)
+  attempts    Int       @default(0)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
 
-  @@map("User")
+  @@index([phoneNumber, expiresAt])
   @@schema("dbo")
 }
 
-model SessionModel {
-  id        String   @id
-  expiresAt DateTime
-  token     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
-  user      AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("Session")
-  @@schema("dbo")
-}
-
-model AuthAccount {
-  id                    String    @id
-  accountId             String
-  providerId            String
-  userId                String
-  accessToken           String?
-  refreshToken          String?
-  idToken               String?
-  accessTokenExpiresAt  DateTime?
-  refreshTokenExpiresAt DateTime?
-  scope                 String?
-  password              String?
-  issuer                String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  user                  AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("Account")
-  @@schema("dbo")
-}
-
-model AuthVerification {
+model CustomAuthSession {
   id         String   @id
-  identifier String
-  value      String
+  tokenHash  String   @unique @db.NVarChar(128)
+  role       String   @db.NVarChar(20)
+  personId   Int?
+  userInfoId Int?     @db.SmallInt
   expiresAt  DateTime
   createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  lastSeenAt DateTime @default(now())
+  ipAddress  String?  @db.NVarChar(64)
+  userAgent  String?  @db.NVarChar(512)
 
-  @@map("Verification")
+  @@index([personId])
+  @@index([userInfoId])
+  @@index([expiresAt])
   @@schema("dbo")
 }
 
@@ -899,7 +865,6 @@ model Person {
   PersonInProject                   PersonInProject[]
   ProformaH                         ProformaH[]
   SponsorLoan                       SponsorLoan[]
-  user                              AuthUser[]
   WhDocD                            WhDocD[]
   WhDocDEdited                      WhDocDEdited[]
   WhDocDTemporary                   WhDocDTemporary[]

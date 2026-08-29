@@ -11,11 +11,6 @@ export const createUserInfoSchema = z.object({
     .max(50)
     .optional(),
 
-  UserLoginPassword: z
-    .string()
-    .max(50)
-    .optional(),
-
   UserPermits_Menues: z
     .string()
     .max(400)

@@ -77,8 +77,6 @@ export const createPersonSchema = z.object({
   AutomaticSettelAfterSale: z.boolean().optional(),
   AutomaticSettelAfterSaleReturn: z.boolean().optional(),
 
-  OnlinePassword: z.string().max(50).optional(),
-
   IsRegisteredOnline: z.boolean().optional(),
 
   BornDay: z.number().int().optional(),
@@ -107,7 +105,6 @@ export const createPersonSchema = z.object({
   ActiveCategory: z.string().max(50).optional(),
 
   UserName: z.string().max(250).optional(),
-  Passwrod: z.string().max(250).optional(),
 
   FBornDate: z.string().max(50).optional(),
   MBornDate: z.coerce.date().optional(),

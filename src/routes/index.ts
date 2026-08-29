@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { auth } from "../lib/auth.js";
 import {
   requireAuth,
   type AuthEnv,
@@ -14,6 +13,7 @@ import { homepageRoutes } from "../modules/homepage/homepage.routes.js";
 import { categoryRoutes } from "../modules/categories/category.routes.js";
 import { personRoutes } from "../modules/persons/person.routes.js";
 import { userInfoRoutes } from "../modules/userInfo/userInfo.routes.js";
+import { authRoutes } from "../modules/auth/auth.routes.js";
 
 export const routes = new Hono<AuthEnv>();
 
@@ -44,12 +44,8 @@ routes.use(
   })
 );
 
-// Better Auth
-routes.all("/api/auth/*", async (c) => {
-  console.log("Better Auth request:", c.req.method, c.req.path);
+routes.route("/api/auth", authRoutes);
 
-  return auth.handler(c.req.raw);
-});
 
 
 // تست وضعیت سرور
@@ -59,12 +55,10 @@ routes.get("/", (c) => {
 
 // مسیر محافظت‌شده
 routes.get("/api/me", requireAuth, (c) => {
-  const user = c.get("user");
   const session = c.get("session");
 
   return c.json({
     success: true,
-    user,
     session,
   });
 });

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { requireAdminAuth } from "../../middleware/auth.middleware.js";
 
 import {
   activateUserController,
@@ -11,6 +12,8 @@ import {
 } from "./userInfo.controller.js";
 
 export const userInfoRoutes = new Hono();
+
+userInfoRoutes.use("*", requireAdminAuth);
 
 userInfoRoutes.get("/", getUsers);
 

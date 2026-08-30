@@ -1,6 +1,6 @@
 ```
-npm install
-npm run dev
+pnpm install
+npm dev
 ```
 
 ```

@@ -4,7 +4,6 @@ import {
   requireAuth,
   type AuthEnv,
 } from "../middleware/auth.middleware.js";
-
 import { productRoutes } from "../modules/products/product.routes.js";
 import { sliderRoutes } from "../modules/slider/slider.routes.js";
 import { footerRoutes } from "../modules/footer/footer.routes.js";
@@ -43,17 +42,10 @@ routes.use(
     credentials: true,
   })
 );
-
 routes.route("/api/auth", authRoutes);
-
-
-
-// تست وضعیت سرور
 routes.get("/", (c) => {
   return c.text("Server is running!");
 });
-
-// مسیر محافظت‌شده
 routes.get("/api/me", requireAuth, (c) => {
   const session = c.get("session");
 
@@ -62,8 +54,6 @@ routes.get("/api/me", requireAuth, (c) => {
     session,
   });
 });
-
-// اتصال ماژول‌ها
 routes.route("/products", productRoutes);
 routes.route("/sliders", sliderRoutes);
 routes.route("/footer", footerRoutes);

@@ -444,64 +444,6 @@ CREATE TABLE [dbo].[SiteFooterData] (
 );
 
 -- CreateTable
-CREATE TABLE [dbo].[User] (
-    [id] NVARCHAR(1000) NOT NULL,
-    [name] NVARCHAR(1000) NOT NULL,
-    [email] NVARCHAR(1000) NOT NULL,
-    [emailVerified] BIT NOT NULL CONSTRAINT [User_emailVerified_df] DEFAULT 0,
-    [image] NVARCHAR(1000),
-    [createdAt] DATETIME2 NOT NULL CONSTRAINT [User_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
-    [updatedAt] DATETIME2 NOT NULL,
-    [personId] INT,
-    CONSTRAINT [User_pkey] PRIMARY KEY CLUSTERED ([id]),
-    CONSTRAINT [User_email_key] UNIQUE NONCLUSTERED ([email]),
-    CONSTRAINT [User_personId_key] UNIQUE NONCLUSTERED ([personId])
-);
-
--- CreateTable
-CREATE TABLE [dbo].[Session] (
-    [id] NVARCHAR(1000) NOT NULL,
-    [expiresAt] DATETIME2 NOT NULL,
-    [token] NVARCHAR(1000) NOT NULL,
-    [createdAt] DATETIME2 NOT NULL CONSTRAINT [Session_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
-    [updatedAt] DATETIME2 NOT NULL,
-    [ipAddress] NVARCHAR(1000),
-    [userAgent] NVARCHAR(1000),
-    [userId] NVARCHAR(1000) NOT NULL,
-    CONSTRAINT [Session_pkey] PRIMARY KEY CLUSTERED ([id]),
-    CONSTRAINT [Session_token_key] UNIQUE NONCLUSTERED ([token])
-);
-
--- CreateTable
-CREATE TABLE [dbo].[Account] (
-    [id] NVARCHAR(1000) NOT NULL,
-    [accountId] NVARCHAR(1000) NOT NULL,
-    [providerId] NVARCHAR(1000) NOT NULL,
-    [userId] NVARCHAR(1000) NOT NULL,
-    [accessToken] NVARCHAR(1000),
-    [refreshToken] NVARCHAR(1000),
-    [idToken] NVARCHAR(1000),
-    [accessTokenExpiresAt] DATETIME2,
-    [refreshTokenExpiresAt] DATETIME2,
-    [scope] NVARCHAR(1000),
-    [password] NVARCHAR(1000),
-    [createdAt] DATETIME2 NOT NULL CONSTRAINT [Account_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
-    [updatedAt] DATETIME2 NOT NULL,
-    CONSTRAINT [Account_pkey] PRIMARY KEY CLUSTERED ([id])
-);
-
--- CreateTable
-CREATE TABLE [dbo].[Verification] (
-    [id] NVARCHAR(1000) NOT NULL,
-    [identifier] NVARCHAR(1000) NOT NULL,
-    [value] NVARCHAR(1000) NOT NULL,
-    [expiresAt] DATETIME2 NOT NULL,
-    [createdAt] DATETIME2 NOT NULL CONSTRAINT [Verification_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
-    [updatedAt] DATETIME2 NOT NULL,
-    CONSTRAINT [Verification_pkey] PRIMARY KEY CLUSTERED ([id])
-);
-
--- CreateTable
 CREATE TABLE [dbo].[Person] (
     [RowID] INT NOT NULL,
     [Branch_ID] INT,
@@ -758,15 +700,6 @@ ALTER TABLE [dbo].[OrderD] ADD CONSTRAINT [OrderD_OrderH_ID_fkey] FOREIGN KEY ([
 
 -- AddForeignKey
 ALTER TABLE [dbo].[OrderD] ADD CONSTRAINT [OrderD_Good_ID_fkey] FOREIGN KEY ([Good_ID]) REFERENCES [dbo].[Good]([RowID]) ON DELETE NO ACTION ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE [dbo].[User] ADD CONSTRAINT [User_personId_fkey] FOREIGN KEY ([personId]) REFERENCES [dbo].[Person]([RowID]) ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE [dbo].[Session] ADD CONSTRAINT [Session_userId_fkey] FOREIGN KEY ([userId]) REFERENCES [dbo].[User]([id]) ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE [dbo].[Account] ADD CONSTRAINT [Account_userId_fkey] FOREIGN KEY ([userId]) REFERENCES [dbo].[User]([id]) ON DELETE CASCADE ON UPDATE CASCADE;
 
 COMMIT TRAN;
 

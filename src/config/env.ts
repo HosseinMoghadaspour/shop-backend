@@ -23,6 +23,10 @@ export const env = {
     sender: process.env.SMS_SENDER,
   },
 
+  redis: {
+    url: process.env.REDIS_URL ?? "redis://localhost:6379",
+  },
+
   database: {
     server: required("DB_SERVER"),
     instanceName: required("DB_INSTANCE"),

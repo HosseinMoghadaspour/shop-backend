@@ -708,37 +708,6 @@ model SiteFooterData {
   @@schema("dbo")
 }
 
-model CustomOtpCode {
-  id          String    @id
-  phoneNumber String    @db.NVarChar(30)
-  codeHash    String    @db.NVarChar(128)
-  attempts    Int       @default(0)
-  expiresAt   DateTime
-  consumedAt  DateTime?
-  createdAt   DateTime  @default(now())
-
-  @@index([phoneNumber, expiresAt])
-  @@schema("dbo")
-}
-
-model CustomAuthSession {
-  id         String   @id
-  tokenHash  String   @unique @db.NVarChar(128)
-  role       String   @db.NVarChar(20)
-  personId   Int?
-  userInfoId Int?     @db.SmallInt
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  lastSeenAt DateTime @default(now())
-  ipAddress  String?  @db.NVarChar(64)
-  userAgent  String?  @db.NVarChar(512)
-
-  @@index([personId])
-  @@index([userInfoId])
-  @@index([expiresAt])
-  @@schema("dbo")
-}
-
 model Person {
   RowID                             Int                             @id(map: "PK_Person") @default(autoincrement())
   Branch_ID                         Int?

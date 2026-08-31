@@ -37,6 +37,3 @@ lerna-debug.log*
 
 /generated
 
-auth-schema.prisma
-
-schema.prisma

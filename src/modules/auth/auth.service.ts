@@ -1,11 +1,33 @@
 import { createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { prisma } from "../../lib/prisma.js";
+import { redis } from "../../lib/redis.js";
 import { env } from "../../config/env.js";
 
 export type AuthKind = "customer" | "admin";
 const otpLifetimeMs = 3 * 60 * 1000;
 const sessionLifetimeMs = 30 * 24 * 60 * 60 * 1000;
 const maxOtpAttempts = 5;
+
+type RedisOtpRecord = {
+  phoneNumber: string;
+  codeHash: string;
+  attempts: number;
+  expiresAt: string;
+  createdAt: string;
+};
+
+type RedisSessionRecord = {
+  id: string;
+  tokenHash: string;
+  role: "ADMIN" | "CUSTOMER";
+  personId?: number | null;
+  userInfoId?: number | null;
+  expiresAt: string;
+  createdAt: string;
+  lastSeenAt: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+};
 
 function secret() {
   if (env.auth.secret) return env.auth.secret;
@@ -28,6 +50,18 @@ function sameHash(left: string, right: string) {
   const a = Buffer.from(left, "hex");
   const b = Buffer.from(right, "hex");
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function otpKey(phoneNumber: string) {
+  return `auth:otp:${phoneNumber}`;
+}
+
+function sessionKey(tokenHash: string) {
+  return `auth:session:${tokenHash}`;
+}
+
+function toRedisExpiryMs(date: Date) {
+  return Math.max(1, date.getTime() - Date.now());
 }
 
 export async function findPhoneOwner(kind: AuthKind, rawPhone: string) {
@@ -56,9 +90,21 @@ export async function requestOtp(kind: AuthKind, rawPhone: string) {
   const phoneNumber = normalizePhone(rawPhone);
   const owner = await findPhoneOwner(kind, phoneNumber);
   if (!owner) return null;
-  await prisma.customOtpCode.updateMany({ where: { phoneNumber, consumedAt: null }, data: { consumedAt: new Date() } });
+
   const code = String(randomInt(100000, 1000000));
-  await prisma.customOtpCode.create({ data: { id: randomUUID(), phoneNumber, codeHash: hash(code), expiresAt: new Date(Date.now() + otpLifetimeMs) } });
+  const expiresAt = new Date(Date.now() + otpLifetimeMs);
+  const otp: RedisOtpRecord = {
+    phoneNumber,
+    codeHash: hash(code),
+    attempts: 0,
+    expiresAt: expiresAt.toISOString(),
+    createdAt: new Date().toISOString(),
+  };
+
+  await redis.set(otpKey(phoneNumber), JSON.stringify(otp), {
+    PX: toRedisExpiryMs(expiresAt),
+  });
+
   await sendOtp(phoneNumber, code);
   return owner;
 }
@@ -67,23 +113,71 @@ export async function verifyOtp(kind: AuthKind, rawPhone: string, code: string) 
   const phoneNumber = normalizePhone(rawPhone);
   const owner = await findPhoneOwner(kind, phoneNumber);
   if (!owner) return null;
-  const otp = await prisma.customOtpCode.findFirst({ where: { phoneNumber, consumedAt: null, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" } });
-  if (!otp || otp.attempts >= maxOtpAttempts || !sameHash(otp.codeHash, hash(code))) {
-    if (otp) await prisma.customOtpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
+
+  const storedOtpRaw = await redis.get(otpKey(phoneNumber));
+  if (!storedOtpRaw) return null;
+
+  const otp = JSON.parse(storedOtpRaw) as RedisOtpRecord;
+  const expiresAt = new Date(otp.expiresAt);
+  if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+    await redis.del(otpKey(phoneNumber));
     return null;
   }
-  await prisma.customOtpCode.update({ where: { id: otp.id }, data: { consumedAt: new Date() } });
+
+  if (otp.attempts >= maxOtpAttempts || !sameHash(otp.codeHash, hash(code))) {
+    const nextAttempts = otp.attempts + 1;
+    if (nextAttempts >= maxOtpAttempts) {
+      await redis.del(otpKey(phoneNumber));
+      return null;
+    }
+
+    const nextValue: RedisOtpRecord = { ...otp, attempts: nextAttempts };
+    await redis.set(otpKey(phoneNumber), JSON.stringify(nextValue), {
+      PX: toRedisExpiryMs(expiresAt),
+    });
+    return null;
+  }
+
+  await redis.del(otpKey(phoneNumber));
+
   const token = randomBytes(32).toString("base64url");
-  const session = await prisma.customAuthSession.create({ data: { id: randomUUID(), tokenHash: hash(token), role: kind === "admin" ? "ADMIN" : "CUSTOMER", personId: kind === "customer" ? owner.RowID : undefined, userInfoId: kind === "admin" ? owner.RowID : undefined, expiresAt: new Date(Date.now() + sessionLifetimeMs) } });
-  return { token, session, owner };
+  const sessionId = randomUUID();
+  const sessionExpiry = new Date(Date.now() + sessionLifetimeMs);
+  const sessionRecord: RedisSessionRecord = {
+    id: sessionId,
+    tokenHash: hash(token),
+    role: kind === "admin" ? "ADMIN" : "CUSTOMER",
+    personId: kind === "customer" ? owner.RowID : null,
+    userInfoId: kind === "admin" ? owner.RowID : null,
+    expiresAt: sessionExpiry.toISOString(),
+    createdAt: new Date().toISOString(),
+    lastSeenAt: new Date().toISOString(),
+    ipAddress: null,
+    userAgent: null,
+  };
+
+  await redis.set(sessionKey(sessionRecord.tokenHash), JSON.stringify(sessionRecord), {
+    PX: toRedisExpiryMs(sessionExpiry),
+  });
+
+  return { token, session: sessionRecord, owner };
 }
 
 export async function getSessionByToken(token: string) {
-  const session = await prisma.customAuthSession.findUnique({ where: { tokenHash: hash(token) } });
-  if (!session || session.expiresAt <= new Date()) return null;
+  const tokenHash = hash(token);
+  const sessionRaw = await redis.get(sessionKey(tokenHash));
+  if (!sessionRaw) return null;
+
+  const session = JSON.parse(sessionRaw) as RedisSessionRecord;
+  const expiresAt = new Date(session.expiresAt);
+  if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+    await redis.del(sessionKey(tokenHash));
+    return null;
+  }
+
   return session;
 }
 
 export async function revokeSession(token: string) {
-  await prisma.customAuthSession.deleteMany({ where: { tokenHash: hash(token) } });
+  await redis.del(sessionKey(hash(token)));
 }

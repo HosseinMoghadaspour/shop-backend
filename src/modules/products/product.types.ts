@@ -1,49 +1,49 @@
+import type { ProductImage } from "./product-image.types.js";
+import type { ProductPricing } from "../pricing/price.types.js";
+
 export interface Product {
-  RowID: number;
-  Branch_ID: number | null;
-  GoodCategory_ID: number | null;
-  Main_MeasureUnit_ID: number | null;
-  Default_MeasureUnit_ID: number | null;
+  id: number;
+  code: string;
+  name: string;
+  nameEn: string | null;
+  alias: string | null;
 
-  RowCode: string | null;
-  RowName: string | null;
-  RowNameEN: string | null;
-  RowNameAlias: string | null;
+  categoryId: number | null;
+  brandId: number | null;
+  producerId: number | null;
 
-  PurchasePrice: number | null;
-  SalePrice: number | null;
-  DiscountPrice: number | null;
-  ConsumerPrice: number | null;
+  salePrice: number;
+  discountPrice: number | null;
+  consumerPrice: number | null;
 
-  IsActive: boolean | null;
+  isActive: boolean;
+  isShowInOnlineShop: boolean;
 
-  RowDesc: string | null;
+  briefDescription: string | null;
+  fullDescription: string | null;
+  description: string | null;
 
-  FirstStock: number | null;
-  OrderPoint: number | null;
+  isSpecialSale: boolean;
+  amazingSale: boolean;
 
-  IsHasSize: boolean | null;
-  Warehouse_ID: number | null;
+  minOrder: number | null;
+  maxOrder: number | null;
+  minShow: number | null;
 
-  Producers_ID: number | null;
-  BrandID: number | null;
+  stock: number;
+  orderPoint: number | null;
 
-  IsShowInOnlineShop: boolean | null;
-  BriefDescription: string | null;
-  FullDescription: string | null;
+  isHasSize: boolean;
+  width: number | null;
+  height: number | null;
+  length: number | null;
+  weight: number | null;
 
-  IsSpecialSale: boolean | null;
-  AmazingSale: boolean | null;
+  showInCofferMenu: boolean;
 
-  MinOrderSite: number | null;
-  MaxOrderSite: number | null;
-  MinSiteShow: number | null;
+  images: ProductImage[];
+  pricing: ProductPricing;
 
-  Width: number | null;
-  Height: number | null;
-  Length: number | null;
-  Weight: number | null;
-
-  ShowInCofferMenu: boolean | null;
-  ProfitFromConsumer: number | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
 }

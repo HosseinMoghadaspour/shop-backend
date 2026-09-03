@@ -4,35 +4,34 @@ import {
   findProducts,
   getAmazingProducts as findAmazingProducts,
   getNewProducts as findNewProducts,
-  type ProductFilters
+  type ProductFilters,
 } from "./product.repository.js";
 
 export async function getProducts(filters: ProductFilters) {
   const result = await findProducts(filters);
-
   return {
     items: result.items,
     pagination: {
       page: filters.page,
       limit: filters.limit,
       total: result.total,
-      totalPages: Math.ceil(result.total / filters.limit)
-    }
+      totalPages: Math.ceil(result.total / filters.limit),
+    },
   };
 }
 
-export async function getProductById(id: number) {
-  return findProductById(id);
+export function getProductById(id: number, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {
+  return findProductById(id, options);
 }
 
-export async function getProductByCode(code: string) {
-  return findProductByCode(code);
+export function getProductByCode(code: string, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {
+  return findProductByCode(code, options);
 }
 
-export async function getAmazingProducts(limit = 12) {
-  return findAmazingProducts(limit);
+export function getAmazingProducts(limit = 12, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {
+  return findAmazingProducts(limit, options);
 }
 
-export async function getNewProducts(limit = 12) {
-  return findNewProducts(limit);
+export function getNewProducts(limit = 12, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {
+  return findNewProducts(limit, options);
 }

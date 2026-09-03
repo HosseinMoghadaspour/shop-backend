@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { requireAdminAuth } from "../../middleware/auth.middleware.js";
+import { requireAdmin } from "../../middleware/auth.middleware.js";
 
 import {
   activatePersonController,
@@ -17,16 +17,16 @@ personRoutes.get("/", getPersons);
 
 personRoutes.get("/:id", getPersonById);
 
-personRoutes.post("/", requireAdminAuth, createPersonController);
+personRoutes.post("/", requireAdmin, createPersonController);
 
 
-personRoutes.put("/:id", requireAdminAuth, updatePersonController);
+personRoutes.put("/:id", requireAdmin, updatePersonController);
 
-personRoutes.delete("/:id", requireAdminAuth, deletePersonController);
+personRoutes.delete("/:id", requireAdmin, deletePersonController);
 
 personRoutes.patch(
   "/:id/activate",
-  requireAdminAuth,
+  requireAdmin,
   activatePersonController,
 );
 
@@ -34,6 +34,6 @@ personRoutes.patch(
 // PATCH /api/persons/:id/deactivate
 personRoutes.patch(
   "/:id/deactivate",
-  requireAdminAuth,
+  requireAdmin,
   deactivatePersonController,
 );

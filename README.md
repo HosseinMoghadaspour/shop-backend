@@ -1,6 +1,6 @@
 ```
 pnpm install
-npm dev
+pnpm dev
 ```
 
 ```

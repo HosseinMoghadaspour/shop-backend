@@ -101,6 +101,11 @@ function buildProductWhere(filters: ProductFilters) {
               RowNameAlias: {
                 contains: filters.search
               }
+            },
+            {
+              SiteName: {
+                contains: filters.search
+              }
             }
           ]
         }

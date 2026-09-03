@@ -1,5 +1,8 @@
 import { Hono } from "hono";
-import { requireAdminAuth } from "../../middleware/auth.middleware.js";
+
+import {
+  requireAdmin,
+} from "../../middleware/auth.middleware.js";
 
 import {
   activateUserController,
@@ -11,28 +14,44 @@ import {
   updateUserController,
 } from "./userInfo.controller.js";
 
-export const userInfoRoutes = new Hono();
+export const userInfoRoutes =
+  new Hono();
 
-userInfoRoutes.use("*", requireAdminAuth);
+userInfoRoutes.use(
+  "*",
+  requireAdmin,
+);
 
-userInfoRoutes.get("/", getUsers);
+userInfoRoutes.get(
+  "/",
+  getUsers,
+);
 
-userInfoRoutes.get("/:id", getUserById);
+userInfoRoutes.get(
+  "/:id",
+  getUserById,
+);
 
-userInfoRoutes.post("/", createUserController);
+userInfoRoutes.post(
+  "/",
+  createUserController,
+);
 
+userInfoRoutes.put(
+  "/:id",
+  updateUserController,
+);
 
-userInfoRoutes.put("/:id", updateUserController);
-
-userInfoRoutes.delete("/:id", deleteUserController);
+userInfoRoutes.delete(
+  "/:id",
+  deleteUserController,
+);
 
 userInfoRoutes.patch(
   "/:id/activate",
   activateUserController,
 );
 
-
-// PATCH /api/persons/:id/deactivate
 userInfoRoutes.patch(
   "/:id/deactivate",
   deactivateUserController,

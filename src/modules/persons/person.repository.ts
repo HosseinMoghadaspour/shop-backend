@@ -1,9 +1,10 @@
-import { prisma } from "../../lib/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
+import { prisma } from "../../lib/prisma.js";
 import type {
   CreatePersonInput,
   UpdatePersonInput,
 } from "./person.schema.js";
+import { randomUUID } from "node:crypto";
 
 export interface FindPersonsParams {
   skip: number;
@@ -117,11 +118,25 @@ export async function findByCode(code: string) {
 }
 
 export async function create(data: CreatePersonInput) {
+  const createData: Prisma.PersonUncheckedCreateInput = {
+    ...data,
+
+    RowCode: data.RowCode ?? randomUUID(),
+
+    RowName: data.RowName ?? "مشتری",
+
+    Fix_PersonType_ID: data.Fix_PersonType_ID ?? 2,
+
+    Fix_PersonRemainderType_ID:
+      data.Fix_PersonRemainderType_ID ?? 1,
+
+    IsActive: data.IsActive ?? true,
+  };
+
   return prisma.person.create({
-    data: data as Prisma.PersonUncheckedCreateInput,
+    data: createData,
   });
 }
-
 export async function update(
   id: number,
   data: UpdatePersonInput,

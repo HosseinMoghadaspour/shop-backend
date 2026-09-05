@@ -23,8 +23,6 @@ export const personListQuerySchema = z.object({
 });
 
 export const createPersonSchema = z.object({
-  RowID: z.number().int().positive(),
-
   Branch_ID: z.number().int().optional(),
   Fix_PersonType_ID: z.number().int().optional(),
   PersonKind_ID: z.number().int().optional(),
@@ -126,6 +124,9 @@ export const createPersonSchema = z.object({
   CarMinWeight: z.number().optional(),
   CarMaxWeight: z.number().optional(),
 });
+
+
+
 
 export const updatePersonSchema = createPersonSchema.partial();
 

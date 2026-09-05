@@ -13,7 +13,7 @@ import {
 
 export const personRoutes = new Hono();
 
-personRoutes.get("/", getPersons);
+personRoutes.get("/", requireAdmin ,getPersons);
 
 personRoutes.get("/:id", getPersonById);
 

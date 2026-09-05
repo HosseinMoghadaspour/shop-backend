@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import {
   requireAuth,
-  type AuthEnv,
 } from "../middleware/auth.middleware.js";
 import { productRoutes } from "../modules/products/product.routes.js";
 import { sliderRoutes } from "../modules/slider/slider.routes.js";
@@ -13,8 +12,15 @@ import { categoryRoutes } from "../modules/categories/category.routes.js";
 import { personRoutes } from "../modules/persons/person.routes.js";
 import { userInfoRoutes } from "../modules/userInfo/userInfo.routes.js";
 import { authRoutes } from "../modules/auth/auth.routes.js";
+import { cartRoutes } from "../modules/cart/cart.routes.js";
 
-export const routes = new Hono<AuthEnv>();
+type RouteEnv = {
+  Variables: {
+    session: unknown;
+  };
+};
+
+export const routes = new Hono<RouteEnv>();
 
 routes.use(
   "*",
@@ -62,3 +68,4 @@ routes.route("/home", homepageRoutes);
 routes.route("/categories", categoryRoutes);
 routes.route("/persons", personRoutes);
 routes.route("/users", userInfoRoutes);
+routes.route("/cart", cartRoutes);

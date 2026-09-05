@@ -1,843 +1,356 @@
 import type { Context } from "hono";
-
 import {
-  requestOtp as createOtp,
-  revokeSession,
-  revokeAllSessions,
-  verifyOtp as verifyCode,
-  normalizePhone,
+  getCurrentUser,
+  logout,
+  requestOtp,
+  verifyOtp,
+  SESSION_COOKIE_NAME,
+  SESSION_TTL_SECONDS,
   type AuthKind,
 } from "./auth.service.js";
 
-import { createPerson } from "../persons/person.service.js";
-
-/**
- * =========================================================
- * PUBLIC DATA
- * =========================================================
- */
-
-function publicData(value: unknown) {
-  return JSON.parse(
-    JSON.stringify(
-      value,
-      (key, nested) => {
-        if (
-          [
-            "Passwrod",
-            "OnlinePassword",
-            "UserLoginPassword",
-          ].includes(key)
-        ) {
-          return undefined;
-        }
-
-        if (
-          typeof nested ===
-          "bigint"
-        ) {
-          return nested.toString();
-        }
-
-        return nested;
-      }
-    )
-  );
-}
-
-/**
- * =========================================================
- * CLIENT IP
- * =========================================================
- */
-
-function getClientIp(
-  c: Context
-) {
-  const cloudflareIp =
-    c.req.header(
-      "cf-connecting-ip"
-    );
-
-  if (cloudflareIp) {
-    return cloudflareIp.trim();
-  }
-
-  const forwardedFor =
-    c.req.header(
-      "x-forwarded-for"
-    );
-
-  if (forwardedFor) {
-    const firstIp =
-      forwardedFor
-        .split(",")[0]
-        ?.trim();
-
-    if (firstIp) {
-      return firstIp;
-    }
-  }
-
-  const realIp =
-    c.req.header(
-      "x-real-ip"
-    );
-
-  if (realIp) {
-    return realIp.trim();
-  }
-
-  return "unknown";
-}
-
-/**
- * =========================================================
- * USER AGENT
- * =========================================================
- */
-
-function getUserAgent(
-  c: Context
-) {
-  const userAgent =
-    c.req.header(
-      "user-agent"
-    );
-
-  if (!userAgent) {
-    return null;
-  }
-
-  return userAgent.slice(
-    0,
-    512
-  );
-}
-
-/**
- * =========================================================
- * COOKIE
- * =========================================================
- */
-
-const sessionCookieName =
-  "shop_session";
-
-const sessionCookieMaxAge =
-  30 * 24 * 60 * 60;
-
-/**
- * Set session cookie.
- */
-
-function setCookie(
-  c: Context,
-  token: string
-) {
-  const parts = [
-    `${sessionCookieName}=${token}`,
-    "Path=/",
-    "HttpOnly",
-    "SameSite=Lax",
-    `Max-Age=${sessionCookieMaxAge}`,
-  ];
-
-  if (
-    process.env.NODE_ENV ===
-    "production"
-  ) {
-    parts.push("Secure");
-  }
-
-  c.header(
-    "Set-Cookie",
-    parts.join("; ")
-  );
-}
-
-/**
- * =========================================================
- * GET SESSION TOKEN
- * =========================================================
- */
-
-function getSessionToken(
-  c: Context
-) {
-  const cookie =
-    c.req.header(
-      "cookie"
-    ) ?? "";
-
-  const match =
-    cookie.match(
-      /(?:^|;\s*)shop_session=([^;]+)/
-    );
-
+function getClientIp(c: Context) {
   return (
-    match?.[1] ??
-    null
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    c.req.header("x-real-ip") ??
+    undefined
   );
 }
 
-/**
- * =========================================================
- * CLEAR COOKIE
- * =========================================================
- */
+function getUserAgent(c: Context) {
+  return c.req.header("user-agent") ?? undefined;
+}
 
-function clearSessionCookie(
-  c: Context
+function setSessionCookie(
+  c: Context,
+  token: string,
 ) {
+  const isProduction =
+    process.env.NODE_ENV === "production";
+
   const parts = [
-    `${sessionCookieName}=`,
+    `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
     "Path=/",
+    `Max-Age=${SESSION_TTL_SECONDS}`,
     "HttpOnly",
     "SameSite=Lax",
-    "Max-Age=0",
   ];
 
-  if (
-    process.env.NODE_ENV ===
-    "production"
-  ) {
+  if (isProduction) {
     parts.push("Secure");
   }
 
   c.header(
     "Set-Cookie",
-    parts.join("; ")
+    parts.join("; "),
+  );
+}
+
+function clearSessionCookie(c: Context) {
+  c.header(
+    "Set-Cookie",
+    [
+      `${SESSION_COOKIE_NAME}=`,
+      "Path=/",
+      "Max-Age=0",
+      "HttpOnly",
+      "SameSite=Lax",
+    ].join("; "),
   );
 }
 
 /**
- * =========================================================
- * SIGN OUT
- * =========================================================
+ * POST /auth/customer/request-otp
  */
-
-export async function signOut(
-  c: Context
-) {
-  const token =
-    getSessionToken(c);
-
-  if (token) {
-    await revokeSession(
-      token
-    );
-  }
-
-  clearSessionCookie(c);
-
-  return c.json({
-    success: true,
-    message:
-      "با موفقیت خارج شدید.",
-  });
-}
-
-/**
- * =========================================================
- * REQUEST OTP
- * =========================================================
- */
-
-export async function requestOtp(
+export async function requestCustomerOtp(
   c: Context,
-  kind: AuthKind
 ) {
-  let body: {
-    phoneNumber?: string;
-  };
-
   try {
-    body =
-      await c.req.json<{
-        phoneNumber?: string;
-      }>();
-  } catch {
-    return c.json(
-      {
-        success: false,
-        message:
-          "اطلاعات ارسال‌شده نامعتبر است.",
-      },
-      400
-    );
-  }
+      const body = await c.req
+  .json<{ mobile?: string }>()
+  .catch((): { mobile?: string } => ({}));
 
-  if (
-    !body.phoneNumber ||
-    typeof body.phoneNumber !==
-      "string"
-  ) {
-    return c.json(
-      {
-        success: false,
-        message:
-          "شماره موبایل الزامی است.",
-      },
-      400
-    );
-  }
-
-  const phoneNumber =
-    normalizePhone(
-      body.phoneNumber
+    const result = await requestOtp(
+      "customer",
+      body.mobile ?? "",
     );
 
-  if (
-    !/^\+?\d{10,15}$/.test(
-      phoneNumber
-    )
-  ) {
-    return c.json(
-      {
-        success: false,
-        message:
-          "شماره موبایل نامعتبر است.",
-      },
-      400
-    );
-  }
-
-  const ipAddress =
-    getClientIp(c);
-
-  /**
-   * First attempt.
-   */
-  let result;
-
-  try {
-    result =
-      await createOtp(
-        kind,
-        phoneNumber,
-        ipAddress
-      );
+    return c.json({
+      success: true,
+      message:
+        "کد تایید با موفقیت ارسال شد.",
+      data: result,
+    });
   } catch (error) {
-    console.error(
-      "OTP request error:",
-      error
-    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : "خطا در ارسال کد تایید.";
 
     return c.json(
       {
         success: false,
-        message:
-          "در ارسال کد تایید خطایی رخ داد.",
-      },
-      500
-    );
-  }
-
-  /**
-   * Rate limit.
-   */
-  if (
-    result.status ===
-    "rate_limited"
-  ) {
-    return c.json(
-      {
-        success: false,
-        message:
-          "تعداد درخواست‌ها بیش از حد مجاز است. لطفاً بعداً دوباره تلاش کنید.",
-      },
-      429
-    );
-  }
-
-  /**
-   * Cooldown.
-   */
-  if (
-    result.status ===
-    "cooldown"
-  ) {
-    return c.json(
-      {
-        success: false,
-        message:
-          "لطفاً قبل از درخواست کد جدید کمی صبر کنید.",
-      },
-      429
-    );
-  }
-
-  /**
-   * =======================================================
-   * CUSTOMER AUTO CREATE
-   * =======================================================
-   */
-
-  if (
-    result.status ===
-    "not_found"
-  ) {
-    /**
-     * Admin can NEVER be auto-created.
-     */
-    if (
-      kind === "admin"
-    ) {
-      /**
-       * Generic response prevents
-       * account enumeration.
-       */
-      return c.json({
-        success: true,
-        message:
-          "اگر اطلاعات واردشده معتبر باشد، کد تایید ارسال خواهد شد.",
-      });
-    }
-
-    /**
-     * Customer does not exist.
-     * Create it.
-     */
-    const person =
-      await createPerson({
-        RowID: 0,
-
-        MobileNumber:
-          phoneNumber,
-
-        MobileForSMS:
-          phoneNumber,
-
-        IsActive: true,
-      });
-
-    if (!person) {
-      return c.json(
-        {
-          success: false,
-          message:
-            "ایجاد حساب کاربری انجام نشد.",
-        },
-        500
-      );
-    }
-
-    /**
-     * requestOtp() released cooldown
-     * when account did not exist,
-     * so calling it again is safe.
-     */
-    try {
-      const newResult =
-        await createOtp(
-          kind,
-          phoneNumber,
-          ipAddress
-        );
-
-      if (
-        newResult.status !==
-        "sent"
-      ) {
-        return c.json(
-          {
-            success: false,
-            message:
-              "ایجاد کد تایید انجام نشد.",
-          },
-          500
-        );
-      }
-
-      return c.json({
-        success: true,
-        message:
-          "کد تایید ارسال شد.",
-      });
-    } catch (error) {
-      console.error(
-        "OTP after customer creation error:",
-        error
-      );
-
-      return c.json(
-        {
-          success: false,
-          message:
-            "ارسال کد تایید انجام نشد.",
-        },
-        500
-      );
-    }
-  }
-
-  return c.json({
-    success: true,
-    message:
-      "کد تایید ارسال شد.",
-  });
-}
-
-/**
- * =========================================================
- * VERIFY OTP
- * =========================================================
- */
-
-export async function verifyOtp(
-  c: Context,
-  kind: AuthKind
-) {
-  let body: {
-    phoneNumber?: string;
-    code?: string;
-  };
-
-  try {
-    body =
-      await c.req.json<{
-        phoneNumber?: string;
-        code?: string;
-      }>();
-  } catch {
-    return c.json(
-      {
-        success: false,
-        message:
-          "اطلاعات ارسال‌شده نامعتبر است.",
-      },
-      400
-    );
-  }
-
-  if (
-    !body.phoneNumber ||
-    !body.code
-  ) {
-    return c.json(
-      {
-        success: false,
-        message:
-          "شماره موبایل و کد تایید الزامی است.",
-      },
-      400
-    );
-  }
-
-  const phoneNumber =
-    normalizePhone(
-      body.phoneNumber
-    );
-
-  const code =
-    body.code.trim();
-
-  if (
-    !/^\+?\d{10,15}$/.test(
-      phoneNumber
-    )
-  ) {
-    return c.json(
-      {
-        success: false,
-        message:
-          "شماره موبایل نامعتبر است.",
-      },
-      400
-    );
-  }
-
-  if (
-    !/^\d{6}$/.test(code)
-  ) {
-    return c.json(
-      {
-        success: false,
-        message:
-          "کد تایید باید ۶ رقم باشد.",
-      },
-      400
-    );
-  }
-
-  const ipAddress =
-    getClientIp(c);
-
-  const userAgent =
-    getUserAgent(c);
-
-  let result;
-
-  try {
-    result =
-      await verifyCode(
-        kind,
-        phoneNumber,
-        code,
-        {
-          ipAddress,
-          userAgent,
-        }
-      );
-  } catch (error) {
-    console.error(
-      "OTP verification error:",
-      error
-    );
-
-    return c.json(
-      {
-        success: false,
-        message:
-          "در بررسی کد تایید خطایی رخ داد.",
-      },
-      500
-    );
-  }
-
-  if (!result) {
-    return c.json(
-      {
-        success: false,
-        message:
-          "کد تایید نامعتبر یا منقضی شده است.",
-      },
-      401
-    );
-  }
-
-  /**
-   * Authentication successful.
-   *
-   * Raw token goes ONLY to HttpOnly cookie.
-   */
-  setCookie(
-    c,
-    result.token
-  );
-
-  return c.json({
-    success: true,
-
-    session: {
-      id:
-        result.session.id,
-
-      role:
-        result.session.role,
-
-      createdAt:
-        result.session.createdAt,
-
-      lastSeenAt:
-        result.session.lastSeenAt,
-
-      expiresAt:
-        result.session.expiresAt,
-    },
-
-    user:
-      publicData(
-        result.owner
-      ),
-  });
-}
-
-/**
- * =========================================================
- * LOGOUT ALL SESSIONS
- * =========================================================
- */
-
-export async function signOutAllSessions(
-  c: Context,
-  kind: AuthKind
-) {
-  const token =
-    getSessionToken(c);
-
-  if (!token) {
-    clearSessionCookie(c);
-
-    return c.json(
-      {
-        success: false,
-        message:
-          "جلسه فعالی وجود ندارد.",
-      },
-      401
-    );
-  }
-
-  /**
-   * We need the current session
-   * to identify the owner.
-   */
-  const { getSessionByToken } =
-    await import(
-      "./auth.service.js"
-    );
-
-  const session =
-    await getSessionByToken(
-      token
-    );
-
-  if (!session) {
-    clearSessionCookie(c);
-
-    return c.json(
-      {
-        success: false,
-        message:
-          "جلسه شما منقضی شده است.",
-      },
-      401
-    );
-  }
-
-  /**
-   * Verify that route kind matches
-   * current session role.
-   */
-  const expectedRole =
-    kind === "admin"
-      ? "ADMIN"
-      : "CUSTOMER";
-
-  if (
-    session.role !==
-    expectedRole
-  ) {
-    return c.json(
-      {
-        success: false,
-        message:
-          "دسترسی غیرمجاز است.",
-      },
-      403
-    );
-  }
-
-  const ownerId =
-    kind === "customer"
-      ? session.personId
-      : session.userInfoId;
-
-  if (
-    ownerId === null ||
-    ownerId === undefined
-  ) {
-    return c.json(
-      {
-        success: false,
-        message:
-          "مالک جلسه معتبر نیست.",
-      },
-      403
-    );
-  }
-
-  const count =
-    await revokeAllSessions(
-      kind,
-      ownerId
-    );
-
-  clearSessionCookie(c);
-
-  return c.json({
-    success: true,
-    revokedSessions:
-      count,
-    message:
-      "تمام جلسات فعال شما باطل شدند.",
-  });
-}
-
-/**
- * =========================================================
- * ROUTE HANDLERS
- * =========================================================
- */
-
-export const requestCustomerOtp =
-  (c: Context) =>
-    requestOtp(
-      c,
-      "customer"
-    );
-
-export const verifyCustomerOtp =
-  (c: Context) =>
-    verifyOtp(
-      c,
-      "customer"
-    );
-
-export const requestAdminOtp =
-  (c: Context) =>
-    requestOtp(
-      c,
-      "admin"
-    );
-
-export const verifyAdminOtp =
-  (c: Context) =>
-    verifyOtp(
-      c,
-      "admin"
-    );
-
-export const signOutAllCustomerSessions =
-  (c: Context) =>
-    signOutAllSessions(
-      c,
-      "customer"
-    );
-
-export const signOutAllAdminSessions =
-  (c: Context) =>
-    signOutAllSessions(
-      c,
-      "admin"
-    );
-
-
-
-export async function signOutAll(c: Context) {
-  const session = c.get("session");
-
-  const ownerId =
-    session.role === "CUSTOMER"
-      ? session.personId
-      : session.userInfoId;
-
-  if (!ownerId) {
-    return c.json(
-      {
-        success: false,
-        message: "اطلاعات کاربر نامعتبر است.",
+        message,
       },
       400,
     );
   }
+}
 
-  const kind: AuthKind =
-    session.role === "CUSTOMER"
-      ? "customer"
-      : "admin";
-
-  await revokeAllSessions(
-    kind,
-    ownerId,
+/**
+ * POST /auth/customer/verify-otp
+ */
+export async function verifyCustomerOtp(
+  c: Context,
+) {
+  try {
+   const body = await c.req
+  .json<{
+    mobile?: string;
+    code?: string;
+  }>()
+  .catch(
+    (): {
+      mobile?: string;
+      code?: string;
+    } => ({}),
   );
 
-  clearSessionCookie(c);
+    const result = await verifyOtp({
+      kind: "customer",
+      mobile: body.mobile ?? "",
+      code: body.code ?? "",
+      ip: getClientIp(c),
+      userAgent: getUserAgent(c),
+    });
 
-  return c.json({
-    success: true,
-    message: "از تمام دستگاه‌ها خارج شدید.",
-  });
+    setSessionCookie(c, result.token);
+
+    return c.json({
+      success: true,
+      message:
+        "ورود با موفقیت انجام شد.",
+      data: {
+        user: result.user,
+        session: {
+          kind: result.session.kind,
+          expiresAt:
+            result.session.expiresAt,
+        },
+        token: result.token,
+      },
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "خطا در تایید کد.";
+
+    return c.json(
+      {
+        success: false,
+        message,
+      },
+      400,
+    );
+  }
+}
+
+/**
+ * POST /auth/admin/request-otp
+ */
+export async function requestAdminOtp(
+  c: Context,
+) {
+  try {
+  const body = await c.req
+  .json<{ mobile?: string }>()
+  .catch((): { mobile?: string } => ({}));
+    const result = await requestOtp(
+      "admin",
+      body.mobile ?? "",
+    );
+
+    return c.json({
+      success: true,
+      message:
+        "کد تایید با موفقیت ارسال شد.",
+      data: result,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "خطا در ارسال کد تایید.";
+
+    return c.json(
+      {
+        success: false,
+        message,
+      },
+      400,
+    );
+  }
+}
+
+/**
+ * POST /auth/admin/verify-otp
+ */
+export async function verifyAdminOtp(
+  c: Context,
+) {
+  try {
+      const body = await c.req
+        .json<{
+          mobile?: string;
+          code?: string;
+        }>()
+      .catch(
+        (): {
+          mobile?: string;
+          code?: string;
+        } => ({}),
+      );
+
+    const result = await verifyOtp({
+      kind: "admin",
+      mobile: body.mobile ?? "",
+      code: body.code ?? "",
+      ip: getClientIp(c),
+      userAgent: getUserAgent(c),
+    });
+
+    setSessionCookie(c, result.token);
+
+    return c.json({
+      success: true,
+      message:
+        "ورود مدیر با موفقیت انجام شد.",
+      data: {
+        user: result.user,
+        session: {
+          kind: result.session.kind,
+          expiresAt:
+            result.session.expiresAt,
+        },
+        token: result.token,
+      },
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "خطا در تایید کد.";
+
+    return c.json(
+      {
+        success: false,
+        message,
+      },
+      400,
+    );
+  }
+}
+
+/**
+ * POST /auth/logout
+ */
+export async function logoutController(
+  c: Context,
+) {
+  try {
+    const auth = c.get("auth") as
+      | {
+          sessionId: string;
+        }
+      | undefined;
+
+    if (auth?.sessionId) {
+      await logout(auth.sessionId);
+    }
+
+    clearSessionCookie(c);
+
+    return c.json({
+      success: true,
+      message: "با موفقیت خارج شدید.",
+    });
+  } catch (error) {
+    console.error(
+      "Logout error:",
+      error,
+    );
+
+    return c.json(
+      {
+        success: false,
+        message: "خطا در خروج از حساب.",
+      },
+      500,
+    );
+  }
+}
+
+/**
+ * GET /auth/me
+ */
+export async function meController(
+  c: Context,
+) {
+  try {
+    const auth = c.get("auth") as
+      | {
+          sessionId: string;
+          kind: AuthKind;
+        }
+      | undefined;
+
+    if (!auth?.sessionId) {
+      return c.json(
+        {
+          success: false,
+          message:
+            "احراز هویت انجام نشده است.",
+        },
+        401,
+      );
+    }
+
+    const user = await getCurrentUser(
+      auth.sessionId,
+    );
+
+    if (!user) {
+      return c.json(
+        {
+          success: false,
+          message:
+            "کاربر پیدا نشد.",
+        },
+        401,
+      );
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        user,
+        kind: auth.kind,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Me controller error:",
+      error,
+    );
+
+    return c.json(
+      {
+        success: false,
+        message:
+          "خطا در دریافت اطلاعات کاربر.",
+      },
+      500,
+    );
+  }
 }

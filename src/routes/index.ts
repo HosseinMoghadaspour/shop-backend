@@ -13,6 +13,7 @@ import { personRoutes } from "../modules/persons/person.routes.js";
 import { userInfoRoutes } from "../modules/userInfo/userInfo.routes.js";
 import { authRoutes } from "../modules/auth/auth.routes.js";
 import { cartRoutes } from "../modules/cart/cart.routes.js";
+import { checkoutRoutes } from "../modules/checkout/checkout.routes.js";
 
 type RouteEnv = {
   Variables: {
@@ -69,3 +70,4 @@ routes.route("/categories", categoryRoutes);
 routes.route("/persons", personRoutes);
 routes.route("/users", userInfoRoutes);
 routes.route("/cart", cartRoutes);
+routes.route("/checkout", checkoutRoutes);

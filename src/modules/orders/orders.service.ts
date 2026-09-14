@@ -541,6 +541,7 @@ export async function order(
       select: {
         Branch_ID: true,
         FinancialYear_ID: true,
+        SiteWareHouseID: true,
       },
     });
 
@@ -550,6 +551,7 @@ export async function order(
   const financialYearId =
     appSetting?.FinancialYear_ID ?? 2;
 
+  const warehouseId = appSetting?.SiteWareHouseID ?? 1;
  
   const orderResponse =
     await prisma.$transaction(
@@ -598,6 +600,8 @@ export async function order(
 
     OrderStatus: true,
 
+    
+
     Branch_ID: branchId,
 
     DiscountPercent: 0,
@@ -624,7 +628,7 @@ export async function order(
 });
 
  
-        await tx.orderD.createMany({
+       const orderD = await tx.orderD.createMany({
           data:
             orderItems.map(
               (item) => ({
@@ -671,12 +675,102 @@ export async function order(
             ),
         });
 
+        const whDocH = await tx.whDocH.create({
+          data: {
+            DocNo: docNo,
+            Person_ID: customer.RowID,
+            MDate: new Date(),
+            FDate: getJalaliDate(),
+            FDateInsert: getJalaliDate(),
+            FTimeInsert: getCurrentTime(),
+            TotalPrice: totalPrice,
+            FinancialYear_ID: financialYearId,
+            TotalDiscountPriceItems: 0,
+            TotalTaxPriceItems: 0,
+            TotalIncreasePrice: 1,
+            TotalDecreasePrice: 0,
+            Branch_ID: branchId,
+            DiscountPercent: 0,
+            DiscountPrice: discountPrice,
+            TaxPercent: 0,
+            TaxPrice: taxPrice,
+            PayablePrice: payablePrice,
+            Fix_DiscountType_ID: 1,
+            Fix_RecordStatusType_ID: 1,
+            Fix_WhDocType1_ID: 1,
+            Fix_WhDocType2_ID: 1,
+            Warehouse_ID: warehouseId,
+            RowDesc: data.deliveryAddress.RowDesc,
+            RowUpdateVersion:1,
+            OrderH_ID: orderH.RowID,
+         },
+         select:{
+          RowID: true
+         }
+        })
+
+        const whDocD = await tx.whDocD.createMany({
+          data:  orderItems.map(
+              (item) => ({
+                Branch_ID:
+                  branchId,
+
+                FinancialYear_ID:
+                  financialYearId,
+
+                WhDocH_ID:
+                  whDocH.RowID,
+
+                Good_ID:
+                  item.goodId,
+
+                InputValue:
+                  0,
+
+                CalculatedInputValue:
+                  0,
+
+                OutputValue:
+                  item.quantity,
+
+                CalculatedOutputValue:
+                  item.quantity,
+
+                UnitPrice:
+                  item.unitPrice,
+
+                TotalPrice:
+                  item.totalPrice,
+                DiscountPrice: 0,
+                DiscountPercent:0,
+                PurchaseUnitPrice: item.unitPrice,
+                PurchaseTotalPrice: item.totalPrice,
+                TaxPercent:0,
+                TaxPrice: 0,
+                SaleUnitPrice: item.unitPrice,
+                MeasureUnit_ID : item.defaultMeasureUnitId,
+                Main_MeasureUnit_ID : item.mainMeasureUnitId,
+                Fix_DiscountType_ID:2
+
+              }),
+            ),
+        })
 
         return {
+
+          whDocHId:
+            Number(
+              whDocH.RowID,
+            ),
+
+          whDocD: whDocD.count,
+
           orderHId:
             Number(
               orderH.RowID,
             ),
+
+            orderD: orderD.count,
 
           docNo:
             Number(

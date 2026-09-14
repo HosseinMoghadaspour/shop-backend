@@ -1,189 +1,440 @@
 import crypto from "node:crypto";
-import {prisma} from "../../lib/prisma.js";
-import {redis} from "../../lib/redis.js";
+
+import { prisma } from "../../lib/prisma.js";
+import { redis } from "../../lib/redis.js";
+
+/* -------------------------------------------------------------------------- */
+/* Types                                                                      */
+/* -------------------------------------------------------------------------- */
 
 export type AuthKind = "customer" | "admin";
 
-type OtpRecord = {
-  codeHash: string;
-  attempts: number;
-  createdAt: number;
-  expiresAt: number;
-};
+export type SessionRole = "CUSTOMER" | "ADMIN";
 
-export type SessionRecord = {
+export interface SessionRecord {
+  sessionId: string;
   userId: number;
   kind: AuthKind;
   createdAt: number;
+  lastActivityAt: number;
+  absoluteExpiresAt: number;
+  idleExpiresAt: number;
   expiresAt: number;
   ip?: string;
   userAgent?: string;
-};
+}
 
-const OTP_TTL_SECONDS = 3 * 60;
-const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+/* -------------------------------------------------------------------------- */
+/* Config                                                                     */
+/* -------------------------------------------------------------------------- */
 
-const MAX_OTP_ATTEMPTS = 5;
+export const SESSION_COOKIE_NAME = "shop_session";
+
+export const CUSTOMER_SESSION_TTL_SECONDS =
+  60 * 60 * 24 * 30;
+
+export const SESSION_TTL_SECONDS =
+  CUSTOMER_SESSION_TTL_SECONDS;
+
+const OTP_TTL_SECONDS = 60 * 3;
 const OTP_COOLDOWN_SECONDS = 60;
+const OTP_MAX_ATTEMPTS = 5;
 
-const SESSION_COOKIE_NAME = "shop_session";
+const OTP_PHONE_LIMIT = 5;
+const OTP_PHONE_WINDOW_SECONDS = 60 * 15;
 
-function otpKey(kind: AuthKind, mobile: string) {
-  return `auth:otp:${kind}:${mobile}`;
+const OTP_IP_LIMIT = 20;
+const OTP_IP_WINDOW_SECONDS = 60 * 15;
+
+const CUSTOMER_ABSOLUTE_SECONDS =
+  60 * 60 * 24 * 30;
+
+const CUSTOMER_IDLE_SECONDS =
+  60 * 60 * 24 * 7;
+
+const ADMIN_ABSOLUTE_SECONDS =
+  60 * 60 * 24 * 7;
+
+const ADMIN_IDLE_SECONDS =
+  60 * 60 * 8;
+
+const MAX_USER_AGENT_LENGTH = 512;
+
+/* -------------------------------------------------------------------------- */
+/* Redis Keys                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function otpKey(
+  kind: AuthKind,
+  phone: string,
+) {
+  return `auth:otp:${kind}:${phone}`;
 }
 
-function otpCooldownKey(kind: AuthKind, mobile: string) {
-  return `auth:otp:cooldown:${kind}:${mobile}`;
+function otpCooldownKey(
+  kind: AuthKind,
+  phone: string,
+) {
+  return `auth:otp:cooldown:${kind}:${phone}`;
 }
 
-function sessionKey(token: string) {
-  return `auth:session:${token}`;
+function otpPhoneRateKey(
+  kind: AuthKind,
+  phone: string,
+) {
+  return `auth:otp:rate:phone:${kind}:${phone}`;
 }
 
-function normalizeMobile(mobile: string) {
-  return mobile.trim().replace(/\s+/g, "");
+function otpIpRateKey(
+  kind: AuthKind,
+  ip: string,
+) {
+  return `auth:otp:rate:ip:${kind}:${ip}`;
 }
 
-function generateOtp() {
-  return crypto.randomInt(100000, 1000000).toString();
+function sessionKey(
+  tokenHash: string,
+) {
+  return `auth:session:${tokenHash}`;
 }
 
-function hashOtp(code: string) {
+function sessionOwnerKey(
+  kind: AuthKind,
+  userId: number,
+) {
+  return `auth:sessions:${kind}:${userId}`;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Secret                                                                     */
+/* -------------------------------------------------------------------------- */
+
+function getAuthSecret(): string {
+  const secret = process.env.AUTH_SECRET;
+
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "AUTH_SECRET is required in production.",
+      );
+    }
+
+    return "development-only-auth-secret-change-me";
+  }
+
+  return secret;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Crypto                                                                     */
+/* -------------------------------------------------------------------------- */
+
+function hashToken(
+  token: string,
+): string {
   return crypto
     .createHmac(
       "sha256",
-      process.env.AUTH_SECRET ?? "change-this-secret",
+      getAuthSecret(),
     )
-    .update(code)
+    .update(token)
     .digest("hex");
 }
 
-function generateSessionToken() {
-  return crypto.randomBytes(48).toString("hex");
+function hashOtp(
+  kind: AuthKind,
+  phone: string,
+  otp: string,
+): string {
+  return crypto
+    .createHmac(
+      "sha256",
+      getAuthSecret(),
+    )
+    .update(`${kind}:${phone}:${otp}`)
+    .digest("hex");
 }
 
-function safeEqual(a: string, b: string) {
-  const aBuffer = Buffer.from(a);
-  const bBuffer = Buffer.from(b);
+function safeEqual(
+  a: string,
+  b: string,
+): boolean {
+  const aa = Buffer.from(a, "utf8");
+  const bb = Buffer.from(b, "utf8");
 
-  if (aBuffer.length !== bBuffer.length) {
+  if (aa.length !== bb.length) {
     return false;
   }
 
-  return crypto.timingSafeEqual(aBuffer, bBuffer);
+  return crypto.timingSafeEqual(
+    aa,
+    bb,
+  );
 }
 
-/**
- * Find customer by mobile number.
- */
-async function findCustomer(mobile: string) {
+function generateSessionToken(): string {
+  return crypto
+    .randomBytes(32)
+    .toString("base64url");
+}
+
+function generateSessionId(): string {
+  return crypto
+    .randomBytes(16)
+    .toString("hex");
+}
+
+function generateOtp(): string {
+  return crypto
+    .randomInt(100000, 1000000)
+    .toString();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export function normalizePhone(
+  phone: string,
+): string {
+  return phone
+    .trim()
+    .replace(/\s+/g, "");
+}
+
+function normalizeUserAgent(
+  userAgent?: string,
+): string | undefined {
+  if (!userAgent) {
+    return undefined;
+  }
+
+  return userAgent.slice(
+    0,
+    MAX_USER_AGENT_LENGTH,
+  );
+}
+
+function getSessionConfig(
+  kind: AuthKind,
+) {
+  if (kind === "admin") {
+    return {
+      absoluteSeconds:
+        ADMIN_ABSOLUTE_SECONDS,
+      idleSeconds:
+        ADMIN_IDLE_SECONDS,
+    };
+  }
+
+  return {
+    absoluteSeconds:
+      CUSTOMER_ABSOLUTE_SECONDS,
+    idleSeconds:
+      CUSTOMER_IDLE_SECONDS,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Customer / Admin Lookup                                                    */
+/* -------------------------------------------------------------------------- */
+
+export async function findCustomer(
+  phone: string,
+) {
+  const normalizedPhone =
+    normalizePhone(phone);
+
   return prisma.person.findFirst({
     where: {
+      IsActive: true,
+
       OR: [
         {
-          MobileNumber: mobile,
+          MobileNumber:
+            normalizedPhone,
         },
         {
-          MobileForSMS: mobile,
+          MobileForSMS:
+            normalizedPhone,
         },
       ],
-      IsActive: true,
-    },
-    select: {
-      RowID: true,
-      MobileNumber: true,
-      MobileForSMS: true,
-      IsActive: true,
     },
   });
 }
 
-/**
- * Find admin by mobile number.
- */
-async function findAdmin(mobile: string) {
+export async function findAdmin(
+  phone: string,
+) {
+  const normalizedPhone =
+    normalizePhone(phone);
+
   return prisma.userInfo.findFirst({
     where: {
-      Mobile: mobile,
-      IsActive: true,
-    },
-    select: {
-      RowID: true,
-      Mobile: true,
-      IsAdmin: true,
-      IsActive: true,
+      Mobile:
+        normalizedPhone,
+
+      IsActive:
+        true,
+
+      IsAdmin:
+        true,
     },
   });
 }
 
-/**
- * Check whether a user exists.
- */
-export async function findUser(
+/* -------------------------------------------------------------------------- */
+/* OTP Rate Limit                                                             */
+/* -------------------------------------------------------------------------- */
+
+async function checkOtpRateLimit(
   kind: AuthKind,
-  mobile: string,
+  phone: string,
+  ip: string,
 ) {
-  const normalizedMobile = normalizeMobile(mobile);
+  const phoneKey =
+    otpPhoneRateKey(
+      kind,
+      phone,
+    );
 
-  if (kind === "customer") {
-    return findCustomer(normalizedMobile);
-  }
+  const ipKey =
+    otpIpRateKey(
+      kind,
+      ip,
+    );
 
-  return findAdmin(normalizedMobile);
-}
+  const phoneCount =
+    await redis.incr(phoneKey);
 
-/**
- * Request OTP.
- *
- * IMPORTANT:
- * For production, replace console.log with your SMS provider.
- */
-export async function requestOtp(
-  kind: AuthKind,
-  mobile: string,
-) {
-  const normalizedMobile = normalizeMobile(mobile);
-
-  if (!normalizedMobile) {
-    throw new Error("شماره موبایل الزامی است.");
-  }
-
-  const user = await findUser(kind, normalizedMobile);
-
-  if (!user) {
-    throw new Error(
-      kind === "customer"
-        ? "کاربری با این شماره موبایل پیدا نشد."
-        : "مدیر با این شماره موبایل پیدا نشد.",
+  if (phoneCount === 1) {
+    await redis.expire(
+      phoneKey,
+      OTP_PHONE_WINDOW_SECONDS,
     );
   }
 
-  const cooldownKey = otpCooldownKey(
-    kind,
-    normalizedMobile,
-  );
+  if (
+    phoneCount >
+    OTP_PHONE_LIMIT
+  ) {
+    throw new Error(
+      "تعداد درخواست کد تأیید برای این شماره بیش از حد مجاز است.",
+    );
+  }
 
-  const cooldown = await redis.get(cooldownKey);
+  const ipCount =
+    await redis.incr(ipKey);
 
-  if (cooldown) {
+  if (ipCount === 1) {
+    await redis.expire(
+      ipKey,
+      OTP_IP_WINDOW_SECONDS,
+    );
+  }
+
+  if (
+    ipCount >
+    OTP_IP_LIMIT
+  ) {
+    throw new Error(
+      "تعداد درخواست کد تأیید از این IP بیش از حد مجاز است.",
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Request OTP                                                                */
+/* -------------------------------------------------------------------------- */
+
+export async function requestOtp(
+  kind: AuthKind,
+  phone: string,
+  ip: string,
+) {
+  const normalizedPhone =
+    normalizePhone(phone);
+
+  if (!normalizedPhone) {
+    throw new Error(
+      "شماره موبایل الزامی است.",
+    );
+  }
+
+  const user =
+    kind === "customer"
+      ? await findCustomer(
+          normalizedPhone,
+        )
+      : await findAdmin(
+          normalizedPhone,
+        );
+
+  /**
+   * Do not reveal account existence.
+   */
+  if (!user) {
+    return {
+      success: true,
+      message:
+        "اگر این شماره قابل استفاده باشد، کد تأیید ارسال خواهد شد.",
+    };
+  }
+
+  const cooldownKey =
+    otpCooldownKey(
+      kind,
+      normalizedPhone,
+    );
+
+  const cooldownExists =
+    await redis.exists(
+      cooldownKey,
+    );
+
+  if (cooldownExists) {
     throw new Error(
       "لطفاً قبل از درخواست کد جدید کمی صبر کنید.",
     );
   }
 
-  const code = generateOtp();
+  await checkOtpRateLimit(
+    kind,
+    normalizedPhone,
+    ip,
+  );
 
-  const record: OtpRecord = {
-    codeHash: hashOtp(code),
-    attempts: 0,
-    createdAt: Date.now(),
-    expiresAt:
-      Date.now() + OTP_TTL_SECONDS * 1000,
-  };
+  const otp =
+    generateOtp();
 
+  const otpHash =
+    hashOtp(
+      kind,
+      normalizedPhone,
+      otp,
+    );
+
+  const key =
+    otpKey(
+      kind,
+      normalizedPhone,
+    );
+
+  const payload =
+    JSON.stringify({
+      hash: otpHash,
+      attempts: 0,
+      createdAt: Date.now(),
+    });
+
+  /**
+   * node-redis v4:
+   *
+   * set(key, value, { EX: seconds })
+   */
   await redis.set(
-    otpKey(kind, normalizedMobile),
-    JSON.stringify(record),
+    key,
+    payload,
     {
       EX: OTP_TTL_SECONDS,
     },
@@ -197,132 +448,273 @@ export async function requestOtp(
     },
   );
 
+  if (
+    process.env.NODE_ENV !==
+    "production"
+  ) {
+    console.log(
+      `[AUTH OTP] ${kind} ${normalizedPhone}: ${otp}`,
+    );
+
+    return {
+      success: true,
+      message:
+        "کد تأیید ایجاد شد.",
+      developmentOtp:
+        otp,
+    };
+  }
+
   /**
    * TODO:
-   * اینجا SMS provider خودت را صدا بزن.
+   * SMS provider.
    */
-  console.log(
-    `[AUTH OTP] ${kind} ${normalizedMobile}: ${code}`,
-  );
-
   return {
     success: true,
-    expiresIn: OTP_TTL_SECONDS,
-    cooldown: OTP_COOLDOWN_SECONDS,
-
-    /**
-     * فقط برای development.
-     *
-     * در production این مقدار را حذف کن.
-     */
-    ...(process.env.NODE_ENV !== "production"
-      ? {
-          developmentOtp: code,
-        }
-      : {}),
+    message:
+      "کد تأیید ارسال شد.",
   };
 }
 
-/**
- * Verify OTP and create session.
- */
-export async function verifyOtp(params: {
-  kind: AuthKind;
-  mobile: string;
-  code: string;
-  ip?: string;
-  userAgent?: string;
-}) {
-  const {
-    kind,
-    code,
-    ip,
-    userAgent,
-  } = params;
+/* -------------------------------------------------------------------------- */
+/* Verify OTP                                                                 */
+/* -------------------------------------------------------------------------- */
 
-  const mobile = normalizeMobile(params.mobile);
+export async function verifyOtp(
+  kind: AuthKind,
+  phone: string,
+  otp: string,
+  ip?: string,
+  userAgent?: string,
+) {
+  const normalizedPhone =
+    normalizePhone(phone);
 
-  if (!mobile || !code) {
+  if (!normalizedPhone) {
     throw new Error(
-      "شماره موبایل و کد تایید الزامی است.",
+      "شماره موبایل الزامی است.",
     );
   }
 
-  const user = await findUser(kind, mobile);
-
-  if (!user) {
+  if (!/^\d{6}$/.test(otp)) {
     throw new Error(
-      kind === "customer"
-        ? "کاربر پیدا نشد."
-        : "مدیر پیدا نشد.",
+      "کد تأیید نامعتبر است.",
     );
   }
 
-  const key = otpKey(kind, mobile);
+  const key =
+    otpKey(
+      kind,
+      normalizedPhone,
+    );
 
-  const raw = await redis.get(key);
+  const raw =
+    await redis.get(key);
 
   if (!raw) {
     throw new Error(
-      "کد تایید منقضی شده یا وجود ندارد.",
+      "کد تأیید منقضی شده یا وجود ندارد.",
     );
   }
 
-  const otp: OtpRecord = JSON.parse(raw);
+  let data: {
+    hash: string;
+    attempts: number;
+    createdAt: number;
+  };
 
-  if (otp.attempts >= MAX_OTP_ATTEMPTS) {
+  try {
+    data =
+      JSON.parse(raw);
+  } catch {
     await redis.del(key);
 
     throw new Error(
-      "تعداد تلاش‌های مجاز تمام شده است.",
+      "اطلاعات کد تأیید نامعتبر است.",
     );
   }
 
-  const receivedHash = hashOtp(code);
+  if (
+    data.attempts >=
+    OTP_MAX_ATTEMPTS
+  ) {
+    await redis.del(key);
 
-  if (!safeEqual(receivedHash, otp.codeHash)) {
-    otp.attempts += 1;
-
-    await redis.set(
-      key,
-      JSON.stringify(otp),
-      {
-        EX: Math.max(
-          1,
-          Math.ceil(
-            (otp.expiresAt - Date.now()) / 1000,
-          ),
-        ),
-      },
+    throw new Error(
+      "تعداد تلاش‌های مجاز برای این کد به پایان رسیده است.",
     );
-
-    throw new Error("کد تایید اشتباه است.");
   }
 
+  const incomingHash =
+    hashOtp(
+      kind,
+      normalizedPhone,
+      otp,
+    );
+
+  const valid =
+    safeEqual(
+      data.hash,
+      incomingHash,
+    );
+
+  if (!valid) {
+    data.attempts += 1;
+
+    const ttl =
+      await redis.ttl(key);
+
+    if (ttl > 0) {
+      await redis.set(
+        key,
+        JSON.stringify(data),
+        {
+          EX: ttl,
+        },
+      );
+    }
+
+    if (
+      data.attempts >=
+      OTP_MAX_ATTEMPTS
+    ) {
+      await redis.del(key);
+
+      throw new Error(
+        "تعداد تلاش‌های مجاز برای این کد به پایان رسیده است.",
+      );
+    }
+
+    throw new Error(
+      "کد تأیید اشتباه است.",
+    );
+  }
+
+  /**
+   * OTP is one-time.
+   */
   await redis.del(key);
 
-  const userId = user.RowID;
+  const user =
+    kind === "customer"
+      ? await findCustomer(
+          normalizedPhone,
+        )
+      : await findAdmin(
+          normalizedPhone,
+        );
 
-  const token = generateSessionToken();
+  if (!user) {
+    throw new Error(
+      "کاربر فعال پیدا نشد.",
+    );
+  }
 
-  const now = Date.now();
+  const token =
+    generateSessionToken();
+
+  const tokenHash =
+    hashToken(token);
+
+  const sessionId =
+    generateSessionId();
+
+  const now =
+    Date.now();
+
+  const config =
+    getSessionConfig(kind);
+
+  const absoluteExpiresAt =
+    now +
+    config.absoluteSeconds *
+      1000;
+
+  const idleExpiresAt =
+    Math.min(
+      now +
+        config.idleSeconds *
+          1000,
+      absoluteExpiresAt,
+    );
 
   const session: SessionRecord = {
-    userId,
+    sessionId,
+
+    userId:
+      user.RowID,
+
     kind,
-    createdAt: now,
+
+    createdAt:
+      now,
+
+    lastActivityAt:
+      now,
+
+    absoluteExpiresAt,
+
+    idleExpiresAt,
+
+    /**
+     * Compatibility with old controller.
+     */
     expiresAt:
-      now + SESSION_TTL_SECONDS * 1000,
+      absoluteExpiresAt,
+
     ip,
-    userAgent,
+
+    userAgent:
+      normalizeUserAgent(
+        userAgent,
+      ),
   };
 
+  const ttlSeconds =
+    Math.max(
+      1,
+      Math.ceil(
+        (idleExpiresAt - now) /
+          1000,
+      ),
+    );
+
+  /* ---------------------------------------------------------------------- */
+  /* Store session                                                           */
+  /* ---------------------------------------------------------------------- */
+
   await redis.set(
-    sessionKey(token),
+    sessionKey(tokenHash),
     JSON.stringify(session),
     {
-      EX: SESSION_TTL_SECONDS,
+      EX: ttlSeconds,
     },
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /* Add session to owner index                                              */
+  /* ---------------------------------------------------------------------- */
+
+  const ownerKey =
+    sessionOwnerKey(
+      kind,
+      user.RowID,
+    );
+
+  await redis.zAdd(
+    ownerKey,
+    {
+      score:
+        absoluteExpiresAt,
+      value:
+        tokenHash,
+    },
+  );
+
+  await redis.expire(
+    ownerKey,
+    config.absoluteSeconds +
+      60 * 60,
   );
 
   return {
@@ -332,9 +724,10 @@ export async function verifyOtp(params: {
   };
 }
 
-/**
- * Get session from Redis.
- */
+/* -------------------------------------------------------------------------- */
+/* Get Session                                                                */
+/* -------------------------------------------------------------------------- */
+
 export async function getSession(
   token: string,
 ): Promise<SessionRecord | null> {
@@ -342,87 +735,475 @@ export async function getSession(
     return null;
   }
 
-  const raw = await redis.get(
-    sessionKey(token),
-  );
+  const tokenHash =
+    hashToken(token);
+
+  const raw =
+    await redis.get(
+      sessionKey(tokenHash),
+    );
 
   if (!raw) {
     return null;
   }
 
+  let session: SessionRecord;
+
   try {
-    const session: SessionRecord =
+    session =
       JSON.parse(raw);
-
-    if (
-      !session.userId ||
-      !session.kind ||
-      session.expiresAt <= Date.now()
-    ) {
-      await redis.del(sessionKey(token));
-      return null;
-    }
-
-    return session;
   } catch {
-    await redis.del(sessionKey(token));
+    await redis.del(
+      sessionKey(tokenHash),
+    );
+
     return null;
   }
-}
 
-/**
- * Delete session.
- */
-export async function logout(
-  token: string,
-) {
-  if (!token) {
-    return;
+  const now =
+    Date.now();
+
+  if (
+    now >=
+    session.absoluteExpiresAt
+  ) {
+    await revokeSession(
+      token,
+    );
+
+    return null;
   }
 
-  await redis.del(sessionKey(token));
+  if (
+    now >=
+    session.idleExpiresAt
+  ) {
+    await revokeSession(
+      token,
+    );
+
+    return null;
+  }
+
+  /**
+   * Compatibility:
+   * old controller expects expiresAt.
+   */
+  session.expiresAt =
+    session.absoluteExpiresAt;
+
+  return session;
 }
 
-/**
- * Get currently authenticated user.
- */
-export async function getCurrentUser(
+/* -------------------------------------------------------------------------- */
+/* Refresh Session                                                            */
+/* -------------------------------------------------------------------------- */
+
+export async function refreshSession(
   token: string,
-) {
-  const session = await getSession(token);
+): Promise<SessionRecord | null> {
+  const session =
+    await getSession(token);
 
   if (!session) {
     return null;
   }
 
-  if (session.kind === "customer") {
-    return prisma.person.findUnique({
-      where: {
-        RowID: session.userId,
-      },
-      select: {
-        RowID: true,
-        MobileNumber: true,
-        MobileForSMS: true,
-        IsActive: true,
-      },
-    });
-  }
+  const now =
+    Date.now();
 
-  return prisma.userInfo.findUnique({
-    where: {
-      RowID: session.userId,
+  const config =
+    getSessionConfig(
+      session.kind,
+    );
+
+  const newIdleExpiresAt =
+    Math.min(
+      now +
+        config.idleSeconds *
+          1000,
+      session.absoluteExpiresAt,
+    );
+
+  session.lastActivityAt =
+    now;
+
+  session.idleExpiresAt =
+    newIdleExpiresAt;
+
+  session.expiresAt =
+    session.absoluteExpiresAt;
+
+  const remainingAbsolute =
+    Math.max(
+      1,
+      Math.ceil(
+        (session.absoluteExpiresAt -
+          now) /
+          1000,
+      ),
+    );
+
+  const remainingIdle =
+    Math.max(
+      1,
+      Math.ceil(
+        (session.idleExpiresAt -
+          now) /
+          1000,
+      ),
+    );
+
+  const ttlSeconds =
+    Math.min(
+      remainingAbsolute,
+      remainingIdle,
+    );
+
+  const tokenHash =
+    hashToken(token);
+
+  await redis.set(
+    sessionKey(tokenHash),
+    JSON.stringify(session),
+    {
+      EX: ttlSeconds,
     },
-    select: {
-      RowID: true,
-      Mobile: true,
-      IsAdmin: true,
-      IsActive: true,
-    },
-  });
+  );
+
+  return session;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Logout                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export async function logout(
+  token: string,
+): Promise<void> {
+  await revokeSession(
+    token,
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Revoke Session                                                             */
+/* -------------------------------------------------------------------------- */
+
+export async function revokeSession(
+  tokenOrSession:
+    | string
+    | SessionRecord,
+): Promise<void> {
+  let tokenHash: string;
+  let session:
+    | SessionRecord
+    | null = null;
+
+  if (
+    typeof tokenOrSession ===
+    "string"
+  ) {
+    tokenHash =
+      hashToken(
+        tokenOrSession,
+      );
+
+    const raw =
+      await redis.get(
+        sessionKey(
+          tokenHash,
+        ),
+      );
+
+    if (raw) {
+      try {
+        session =
+          JSON.parse(raw);
+      } catch {
+        session = null;
+      }
+    }
+  } else {
+    session =
+      tokenOrSession;
+
+    /**
+     * revokeSession normally receives
+     * a token, but accepting a session
+     * object makes the function safer
+     * for internal usage.
+     *
+     * The session object itself does not
+     * contain the token hash, so there is
+     * nothing to delete from Redis here.
+     */
+    return;
+  }
+
+  if (session) {
+    await redis.zRem(
+      sessionOwnerKey(
+        session.kind,
+        session.userId,
+      ),
+      tokenHash,
+    );
+  }
+
+  await redis.del(
+    sessionKey(tokenHash),
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Revoke All Sessions                                                        */
+/* -------------------------------------------------------------------------- */
+
+export async function revokeAllSessions(
+  kind: AuthKind,
+  userId: number,
+): Promise<void> {
+  const ownerKey =
+    sessionOwnerKey(
+      kind,
+      userId,
+    );
+
+  const tokenHashes =
+    await redis.zRange(
+      ownerKey,
+      0,
+      -1,
+    );
+
+  if (
+    tokenHashes.length === 0
+  ) {
+    await redis.del(
+      ownerKey,
+    );
+
+    return;
+  }
+
+  const multi =
+    redis.multi();
+
+  for (
+    const tokenHash of
+      tokenHashes
+  ) {
+    multi.del(
+      sessionKey(
+        tokenHash,
+      ),
+    );
+  }
+
+  multi.del(ownerKey);
+
+  await multi.exec();
+}
+
+/* -------------------------------------------------------------------------- */
+/* List Sessions                                                              */
+/* -------------------------------------------------------------------------- */
+
+export async function listSessions(
+  kind: AuthKind,
+  userId: number,
+): Promise<SessionRecord[]> {
+  const ownerKey =
+    sessionOwnerKey(
+      kind,
+      userId,
+    );
+
+  const tokenHashes =
+    await redis.zRange(
+      ownerKey,
+      0,
+      -1,
+    );
+
+  if (
+    tokenHashes.length === 0
+  ) {
+    return [];
+  }
+
+  const multi =
+    redis.multi();
+
+  for (
+    const tokenHash of
+      tokenHashes
+  ) {
+    multi.get(
+      sessionKey(
+        tokenHash,
+      ),
+    );
+  }
+
+  const results =
+    await multi.exec();
+
+  const sessions:
+    SessionRecord[] = [];
+
+  const expiredHashes:
+    string[] = [];
+
+  const now =
+    Date.now();
+
+  for (
+    let i = 0;
+    i < results.length;
+    i++
+  ) {
+    const raw =
+      results[i];
+
+    const tokenHash =
+      tokenHashes[i];
+
+    if (
+      typeof raw !==
+        "string" ||
+      !raw
+    ) {
+      expiredHashes.push(
+        tokenHash,
+      );
+
+      continue;
+    }
+
+    try {
+      const session:
+        SessionRecord =
+        JSON.parse(raw);
+
+      if (
+        now >=
+          session.absoluteExpiresAt ||
+        now >=
+          session.idleExpiresAt
+      ) {
+        expiredHashes.push(
+          tokenHash,
+        );
+
+        continue;
+      }
+
+      session.expiresAt =
+        session.absoluteExpiresAt;
+
+      sessions.push(
+        session,
+      );
+    } catch {
+      expiredHashes.push(
+        tokenHash,
+      );
+    }
+  }
+
+  if (
+    expiredHashes.length > 0
+  ) {
+    const cleanup =
+      redis.multi();
+
+    for (
+      const hash of
+        expiredHashes
+    ) {
+      cleanup.del(
+        sessionKey(hash),
+      );
+
+      cleanup.zRem(
+        ownerKey,
+        hash,
+      );
+    }
+
+    await cleanup.exec();
+  }
+
+  return sessions;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Current User                                                               */
+/* -------------------------------------------------------------------------- */
+
+export async function getCurrentUser(
+  session: SessionRecord,
+) {
+  if (
+    session.kind ===
+    "customer"
+  ) {
+    const customer =
+      await prisma.person.findUnique(
+        {
+          where: {
+            RowID:
+              session.userId,
+          },
+        },
+      );
+
+    if (
+      !customer ||
+      !customer.IsActive
+    ) {
+      return null;
+    }
+
+    return {
+      kind:
+        "customer" as const,
+
+      user:
+        customer,
+    };
+  }
+
+  const admin =
+    await prisma.userInfo.findUnique(
+      {
+        where: {
+          RowID:
+            session.userId,
+        },
+      },
+    );
+
+  if (
+    !admin ||
+    !admin.IsActive ||
+    !admin.IsAdmin
+  ) {
+    return null;
+  }
+
+  return {
+    kind:
+      "admin" as const,
+
+    user:
+      admin,
+  };
+}
+
+
 export {
-  SESSION_COOKIE_NAME,
-  SESSION_TTL_SECONDS,
+  hashToken,
 };

@@ -1,24 +1,39 @@
 import type { Context } from "hono";
+
 import {
-  getCurrentUser,
-  logout,
   requestOtp,
   verifyOtp,
+  getCurrentUser,
+  logout,
   SESSION_COOKIE_NAME,
   SESSION_TTL_SECONDS,
   type AuthKind,
 } from "./auth.service.js";
 
-function getClientIp(c: Context) {
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function getClientIp(
+  c: Context,
+): string {
   return (
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    c.req
+      .header("x-forwarded-for")
+      ?.split(",")[0]
+      ?.trim() ??
     c.req.header("x-real-ip") ??
-    undefined
+    "unknown"
   );
 }
 
-function getUserAgent(c: Context) {
-  return c.req.header("user-agent") ?? undefined;
+function getUserAgent(
+  c: Context,
+): string | undefined {
+  return (
+    c.req.header("user-agent") ??
+    undefined
+  );
 }
 
 function setSessionCookie(
@@ -26,7 +41,8 @@ function setSessionCookie(
   token: string,
 ) {
   const isProduction =
-    process.env.NODE_ENV === "production";
+    process.env.NODE_ENV ===
+    "production";
 
   const parts = [
     `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
@@ -46,234 +62,265 @@ function setSessionCookie(
   );
 }
 
-function clearSessionCookie(c: Context) {
+function clearSessionCookie(
+  c: Context,
+) {
+  const isProduction =
+    process.env.NODE_ENV ===
+    "production";
+
+  const parts = [
+    `${SESSION_COOKIE_NAME}=`,
+    "Path=/",
+    "Max-Age=0",
+    "HttpOnly",
+    "SameSite=Lax",
+  ];
+
+  if (isProduction) {
+    parts.push("Secure");
+  }
+
   c.header(
     "Set-Cookie",
-    [
-      `${SESSION_COOKIE_NAME}=`,
-      "Path=/",
-      "Max-Age=0",
-      "HttpOnly",
-      "SameSite=Lax",
-    ].join("; "),
+    parts.join("; "),
   );
 }
 
-/**
- * POST /auth/customer/request-otp
- */
+/* -------------------------------------------------------------------------- */
+/* Request OTP                                                                */
+/* -------------------------------------------------------------------------- */
+
+async function requestOtpController(
+  c: Context,
+  kind: AuthKind,
+) {
+  try {
+    const body =
+      await c.req
+        .json<{
+          mobile?: string;
+          phone?: string;
+        }>()
+        .catch(
+          () =>
+            ({
+              mobile: "",
+              phone: "",
+            }),
+        );
+
+    const phone =
+      body.phone ??
+      body.mobile ??
+      "";
+
+    const result =
+      await requestOtp(
+        kind,
+        phone,
+        getClientIp(c),
+      );
+
+    return c.json({
+      success: true,
+      message:
+        result.message ??
+        "کد تأیید ارسال شد.",
+      data: result,
+    });
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "خطا در ارسال کد تأیید.",
+      },
+      400,
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Verify OTP                                                                 */
+/* -------------------------------------------------------------------------- */
+
+async function verifyOtpController(
+  c: Context,
+  kind: AuthKind,
+) {
+  try {
+    const body =
+      await c.req
+        .json<{
+          mobile?: string;
+          phone?: string;
+          code?: string;
+          otp?: string;
+        }>()
+        .catch(
+          () =>
+            ({
+              mobile: "",
+              phone: "",
+              code: "",
+              otp: "",
+            }),
+        );
+
+    const phone =
+      body.phone ??
+      body.mobile ??
+      "";
+
+    const code =
+      body.code ??
+      body.otp ??
+      "";
+
+    const result =
+      await verifyOtp(
+        kind,
+        phone,
+        code,
+        getClientIp(c),
+        getUserAgent(c),
+      );
+
+    setSessionCookie(
+      c,
+      result.token,
+    );
+
+    return c.json({
+      success: true,
+      message:
+        kind === "admin"
+          ? "ورود مدیر با موفقیت انجام شد."
+          : "ورود با موفقیت انجام شد.",
+
+      data: {
+        user:
+          result.user,
+
+        session: {
+          sessionId:
+            result.session
+              .sessionId,
+
+          kind:
+            result.session
+              .kind,
+
+          createdAt:
+            result.session
+              .createdAt,
+
+          lastActivityAt:
+            result.session
+              .lastActivityAt,
+
+          absoluteExpiresAt:
+            result.session
+              .absoluteExpiresAt,
+
+          idleExpiresAt:
+            result.session
+              .idleExpiresAt,
+
+          expiresAt:
+            result.session
+              .expiresAt,
+        },
+      },
+    });
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "خطا در تأیید کد.",
+      },
+      400,
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Customer                                                                    */
+/* -------------------------------------------------------------------------- */
+
 export async function requestCustomerOtp(
   c: Context,
 ) {
-  try {
-      const body = await c.req
-  .json<{ mobile?: string }>()
-  .catch((): { mobile?: string } => ({}));
-
-    const result = await requestOtp(
-      "customer",
-      body.mobile ?? "",
-    );
-
-    return c.json({
-      success: true,
-      message:
-        "کد تایید با موفقیت ارسال شد.",
-      data: result,
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "خطا در ارسال کد تایید.";
-
-    return c.json(
-      {
-        success: false,
-        message,
-      },
-      400,
-    );
-  }
+  return requestOtpController(
+    c,
+    "customer",
+  );
 }
 
-/**
- * POST /auth/customer/verify-otp
- */
 export async function verifyCustomerOtp(
   c: Context,
 ) {
-  try {
-   const body = await c.req
-  .json<{
-    mobile?: string;
-    code?: string;
-  }>()
-  .catch(
-    (): {
-      mobile?: string;
-      code?: string;
-    } => ({}),
+  return verifyOtpController(
+    c,
+    "customer",
   );
-
-    const result = await verifyOtp({
-      kind: "customer",
-      mobile: body.mobile ?? "",
-      code: body.code ?? "",
-      ip: getClientIp(c),
-      userAgent: getUserAgent(c),
-    });
-
-    setSessionCookie(c, result.token);
-
-    return c.json({
-      success: true,
-      message:
-        "ورود با موفقیت انجام شد.",
-      data: {
-        user: result.user,
-        session: {
-          kind: result.session.kind,
-          expiresAt:
-            result.session.expiresAt,
-        },
-        token: result.token,
-      },
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "خطا در تایید کد.";
-
-    return c.json(
-      {
-        success: false,
-        message,
-      },
-      400,
-    );
-  }
 }
 
-/**
- * POST /auth/admin/request-otp
- */
+/* -------------------------------------------------------------------------- */
+/* Admin                                                                       */
+/* -------------------------------------------------------------------------- */
+
 export async function requestAdminOtp(
   c: Context,
 ) {
-  try {
-  const body = await c.req
-  .json<{ mobile?: string }>()
-  .catch((): { mobile?: string } => ({}));
-    const result = await requestOtp(
-      "admin",
-      body.mobile ?? "",
-    );
-
-    return c.json({
-      success: true,
-      message:
-        "کد تایید با موفقیت ارسال شد.",
-      data: result,
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "خطا در ارسال کد تایید.";
-
-    return c.json(
-      {
-        success: false,
-        message,
-      },
-      400,
-    );
-  }
+  return requestOtpController(
+    c,
+    "admin",
+  );
 }
 
-/**
- * POST /auth/admin/verify-otp
- */
 export async function verifyAdminOtp(
   c: Context,
 ) {
-  try {
-      const body = await c.req
-        .json<{
-          mobile?: string;
-          code?: string;
-        }>()
-      .catch(
-        (): {
-          mobile?: string;
-          code?: string;
-        } => ({}),
-      );
-
-    const result = await verifyOtp({
-      kind: "admin",
-      mobile: body.mobile ?? "",
-      code: body.code ?? "",
-      ip: getClientIp(c),
-      userAgent: getUserAgent(c),
-    });
-
-    setSessionCookie(c, result.token);
-
-    return c.json({
-      success: true,
-      message:
-        "ورود مدیر با موفقیت انجام شد.",
-      data: {
-        user: result.user,
-        session: {
-          kind: result.session.kind,
-          expiresAt:
-            result.session.expiresAt,
-        },
-        token: result.token,
-      },
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "خطا در تایید کد.";
-
-    return c.json(
-      {
-        success: false,
-        message,
-      },
-      400,
-    );
-  }
+  return verifyOtpController(
+    c,
+    "admin",
+  );
 }
 
-/**
- * POST /auth/logout
- */
+/* -------------------------------------------------------------------------- */
+/* Logout                                                                      */
+/* -------------------------------------------------------------------------- */
+
 export async function logoutController(
   c: Context,
 ) {
   try {
-    const auth = c.get("auth") as
-      | {
-          sessionId: string;
-        }
-      | undefined;
+    const auth =
+      c.get("auth") as
+        | {
+            sessionId: string;
+          }
+        | undefined;
 
     if (auth?.sessionId) {
-      await logout(auth.sessionId);
+      await logout(
+        auth.sessionId,
+      );
     }
 
     clearSessionCookie(c);
 
     return c.json({
       success: true,
-      message: "با موفقیت خارج شدید.",
+      message:
+        "با موفقیت از حساب خارج شدید.",
     });
   } catch (error) {
     console.error(
@@ -284,26 +331,29 @@ export async function logoutController(
     return c.json(
       {
         success: false,
-        message: "خطا در خروج از حساب.",
+        message:
+          "خطا در خروج از حساب.",
       },
       500,
     );
   }
 }
 
-/**
- * GET /auth/me
- */
+/* -------------------------------------------------------------------------- */
+/* Me                                                                          */
+/* -------------------------------------------------------------------------- */
+
 export async function meController(
   c: Context,
 ) {
   try {
-    const auth = c.get("auth") as
-      | {
-          sessionId: string;
-          kind: AuthKind;
-        }
-      | undefined;
+    const auth =
+      c.get("auth") as
+        | {
+            sessionId: string;
+            kind: AuthKind;
+          }
+        | undefined;
 
     if (!auth?.sessionId) {
       return c.json(
@@ -316,16 +366,41 @@ export async function meController(
       );
     }
 
-    const user = await getCurrentUser(
-      auth.sessionId,
-    );
+    /*
+     * Middleware session را قبلاً
+     * validate کرده است.
+     *
+     * اما برای جلوگیری از اطلاعات stale،
+     * دوباره session را از middleware
+     * می‌گیریم.
+     */
+    const session =
+      c.get("session") as
+        | import("./auth.service.js").SessionRecord
+        | undefined;
 
-    if (!user) {
+    if (!session) {
       return c.json(
         {
           success: false,
           message:
-            "کاربر پیدا نشد.",
+            "نشست معتبر نیست.",
+        },
+        401,
+      );
+    }
+
+    const result =
+      await getCurrentUser(
+        session,
+      );
+
+    if (!result) {
+      return c.json(
+        {
+          success: false,
+          message:
+            "کاربر فعال پیدا نشد.",
         },
         401,
       );
@@ -334,8 +409,25 @@ export async function meController(
     return c.json({
       success: true,
       data: {
-        user,
-        kind: auth.kind,
+        kind:
+          result.kind,
+
+        user:
+          result.user,
+
+        session: {
+          sessionId:
+            session.sessionId,
+
+          lastActivityAt:
+            session.lastActivityAt,
+
+          absoluteExpiresAt:
+            session.absoluteExpiresAt,
+
+          idleExpiresAt:
+            session.idleExpiresAt,
+        },
       },
     });
   } catch (error) {

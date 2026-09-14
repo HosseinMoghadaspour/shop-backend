@@ -1,204 +1,322 @@
-import type { Context, Next } from "hono";
-import { getSession } from "../modules/auth/auth.service.js";
+import type {
+  Context,
+  Next,
+} from "hono";
 
-type CustomerAuth = {
+import {
+  getSession,
+  refreshSession,
+  SESSION_COOKIE_NAME,
+  type AuthKind,
+  type SessionRecord,
+} from "../modules/auth/auth.service.js";
+
+/* -------------------------------------------------------------------------- */
+/* Context Types                                                              */
+/* -------------------------------------------------------------------------- */
+
+export type AuthContext = {
+  RowID: number;
+  kind: AuthKind;
+  sessionId: string;
+};
+
+export type CustomerAuth = {
   RowID: number;
   kind: "customer";
   sessionId: string;
 };
 
-type AdminAuth = {
+export type AdminAuth = {
   RowID: number;
   kind: "admin";
   sessionId: string;
 };
 
-type AuthContext = {
-  RowID: number;
-  kind: "customer" | "admin";
-  sessionId: string;
-};
+/* -------------------------------------------------------------------------- */
+/* Get Token                                                                  */
+/* -------------------------------------------------------------------------- */
 
-const SESSION_COOKIE_NAME = "shop_session";
+function getSessionToken(
+  c: Context,
+): string | null {
+  /*
+   * Authorization: Bearer <token>
+   */
+  const authorization =
+    c.req.header(
+      "Authorization",
+    );
 
-/**
- * Get session token from:
- *
- * 1. Authorization: Bearer <token>
- * 2. Cookie: shop_session=<token>
- */
-function getSessionToken(c: Context): string | null {
-  const authorization = c.req.header("Authorization");
-
-  if (authorization?.startsWith("Bearer ")) {
-    const token = authorization.slice(7).trim();
+  if (
+    authorization?.startsWith(
+      "Bearer ",
+    )
+  ) {
+    const token =
+      authorization
+        .slice(7)
+        .trim();
 
     if (token) {
       return token;
     }
   }
 
-  const cookieHeader = c.req.header("Cookie");
+  /*
+   * Cookie
+   */
+  const cookieHeader =
+    c.req.header("Cookie");
 
   if (!cookieHeader) {
     return null;
   }
 
-  const cookies = cookieHeader.split(";");
+  for (
+    const cookie of
+      cookieHeader.split(";")
+  ) {
+    const [
+      name,
+      ...valueParts
+    ] =
+      cookie
+        .trim()
+        .split("=");
 
-  for (const cookie of cookies) {
-    const [name, ...valueParts] = cookie.trim().split("=");
+    if (
+      name !==
+      SESSION_COOKIE_NAME
+    ) {
+      continue;
+    }
 
-    if (name === SESSION_COOKIE_NAME) {
-      const value = valueParts.join("=");
+    const value =
+      valueParts.join("=");
 
-      if (value) {
-        return decodeURIComponent(value);
-      }
+    if (!value) {
+      return null;
+    }
+
+    try {
+      return decodeURIComponent(
+        value,
+      );
+    } catch {
+      return value;
     }
   }
 
   return null;
 }
 
-/**
- * Common authentication middleware.
- *
- * Session is stored in Redis and resolved by auth.service.
- */
+/* -------------------------------------------------------------------------- */
+/* Authenticate                                                               */
+/* -------------------------------------------------------------------------- */
+
 async function authenticate(
   c: Context,
   next: Next,
-  expectedKind?: "customer" | "admin",
+  expectedKind?: AuthKind,
 ) {
   try {
-    const sessionToken = getSessionToken(c);
+    const token =
+      getSessionToken(c);
 
-    if (!sessionToken) {
+    if (!token) {
       return c.json(
         {
           success: false,
-          message: "احراز هویت انجام نشده است.",
+          message:
+            "احراز هویت انجام نشده است.",
         },
         401,
       );
     }
 
-    const session = await getSession(sessionToken);
+   const session = await refreshSession(token);
 
     if (!session) {
       return c.json(
         {
           success: false,
-          message: "نشست شما معتبر نیست یا منقضی شده است.",
+          message:
+            "نشست شما معتبر نیست یا منقضی شده است.",
         },
         401,
       );
     }
 
-    if (expectedKind && session.kind !== expectedKind) {
+    if (
+      expectedKind &&
+      session.kind !==
+        expectedKind
+    ) {
       return c.json(
         {
           success: false,
-          message: "دسترسی به این بخش برای شما مجاز نیست.",
+          message:
+            "دسترسی به این بخش برای شما مجاز نیست.",
         },
         403,
       );
     }
 
-    const auth: AuthContext = {
-      RowID: session.userId,
-      kind: session.kind,
-      sessionId: sessionToken,
+    const auth:
+      AuthContext = {
+      RowID:
+        session.userId,
+
+      kind:
+        session.kind,
+
+      sessionId:
+        token,
     };
 
-    /**
-     * General auth context
+    /*
+     * General auth
      */
-    c.set("auth", auth);
+    c.set(
+      "auth",
+      auth,
+    );
 
-    /**
-     * Customer context
+    /*
+     * Full session
      */
-    if (session.kind === "customer") {
-      const customer: CustomerAuth = {
-        RowID: session.userId,
-        kind: "customer",
-        sessionId: sessionToken,
+    c.set(
+      "session",
+      session,
+    );
+
+    /*
+     * Customer
+     */
+    if (
+      session.kind ===
+      "customer"
+    ) {
+      const customer:
+        CustomerAuth = {
+        RowID:
+          session.userId,
+
+        kind:
+          "customer",
+
+        sessionId:
+          token,
       };
 
-      c.set("customer", customer);
+      c.set(
+        "customer",
+        customer,
+      );
     }
 
-    /**
-     * Admin context
+    /*
+     * Admin
      */
-    if (session.kind === "admin") {
-      const admin: AdminAuth = {
-        RowID: session.userId,
-        kind: "admin",
-        sessionId: sessionToken,
+    if (
+      session.kind ===
+      "admin"
+    ) {
+      const admin:
+        AdminAuth = {
+        RowID:
+          session.userId,
+
+        kind:
+          "admin",
+
+        sessionId:
+          token,
       };
 
-      c.set("admin", admin);
+      c.set(
+        "admin",
+        admin,
+      );
     }
 
     await next();
   } catch (error) {
-    console.error("Auth middleware error:", error);
+    console.error(
+      "Auth middleware error:",
+      error,
+    );
 
     return c.json(
       {
         success: false,
-        message: "خطا در احراز هویت.",
+        message:
+          "خطا در احراز هویت.",
       },
       500,
     );
   }
 }
 
-/**
- * Require any authenticated user.
- */
-export async function requireAuth(c: Context, next: Next) {
-  return authenticate(c, next);
+/* -------------------------------------------------------------------------- */
+/* Public Middleware                                                          */
+/* -------------------------------------------------------------------------- */
+
+export async function requireAuth(
+  c: Context,
+  next: Next,
+) {
+  return authenticate(
+    c,
+    next,
+  );
 }
 
-/**
- * Require customer authentication.
- *
- * Use for:
- * /cart
- * /orders
- * /profile
- * /addresses
- * ...
- */
-export async function requireCustomerAuth(c: Context, next: Next) {
-  return authenticate(c, next, "customer");
+export async function requireCustomerAuth(
+  c: Context,
+  next: Next,
+) {
+  return authenticate(
+    c,
+    next,
+    "customer",
+  );
 }
 
-/**
- * Alias for backward compatibility.
- *
- * Existing code using requireCustomer
- * will continue to work.
+/*
+ * Backward compatibility
  */
-export async function requireCustomer(c: Context, next: Next) {
-  return requireCustomerAuth(c, next);
+export async function requireCustomer(
+  c: Context,
+  next: Next,
+) {
+  return requireCustomerAuth(
+    c,
+    next,
+  );
 }
 
-/**
- * Require admin authentication.
- */
-export async function requireAdminAuth(c: Context, next: Next) {
-  return authenticate(c, next, "admin");
+export async function requireAdminAuth(
+  c: Context,
+  next: Next,
+) {
+  return authenticate(
+    c,
+    next,
+    "admin",
+  );
 }
 
-/**
- * Alias for backward compatibility.
+/*
+ * Backward compatibility
  */
-export async function requireAdmin(c: Context, next: Next) {
-  return requireAdminAuth(c, next);
+export async function requireAdmin(
+  c: Context,
+  next: Next,
+) {
+  return requireAdminAuth(
+    c,
+    next,
+  );
 }
-

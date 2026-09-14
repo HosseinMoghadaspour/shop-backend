@@ -11,7 +11,8 @@ export type OrderItemResponse = {
     unitPrice: number;
     discountPrice: number;
     totalPrice: number;
-    
+    mainMeasureUnitId: number;
+    defaultMeasureUnitId: number;
 };
 
 export type OrderResponse = {

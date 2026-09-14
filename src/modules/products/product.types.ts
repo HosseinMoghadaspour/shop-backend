@@ -43,7 +43,8 @@ export interface Product {
 
   images: ProductImage[];
   pricing: ProductPricing;
-
+  measureUnitId: number | null;
+mainMeasureUnitId: number | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 }

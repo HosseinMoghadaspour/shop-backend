@@ -1,4 +1,5 @@
 import { Prisma } from "../../generated/prisma/client.js";
+import { MeasureUnitScalarFieldEnum } from "../../generated/prisma/internal/prismaNamespace.js";
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
 
@@ -164,6 +165,9 @@ export async function createOrderDelivery(
   customerId: number,
   data: OrderDeliveryAddressRequest,
 ) {
+  // ---------------------------------------
+  // Validation
+  // ---------------------------------------
 
   if (
     !Number.isInteger(customerId) ||
@@ -184,8 +188,7 @@ export async function createOrderDelivery(
   }
 
   if (
-    !data.deliverToName ||
-    !data.deliverToName.trim()
+    !data.deliverToName?.trim()
   ) {
     throw new Error(
       "نام تحویل گیرنده الزامی است.",
@@ -193,8 +196,7 @@ export async function createOrderDelivery(
   }
 
   if (
-    !data.deliverToMobileNumber ||
-    !data.deliverToMobileNumber.trim()
+    !data.deliverToMobileNumber?.trim()
   ) {
     throw new Error(
       "شماره موبایل تحویل گیرنده الزامی است.",
@@ -202,8 +204,7 @@ export async function createOrderDelivery(
   }
 
   if (
-    !data.City ||
-    !data.City.trim()
+    !data.City?.trim()
   ) {
     throw new Error(
       "شهر الزامی است.",
@@ -211,40 +212,44 @@ export async function createOrderDelivery(
   }
 
   if (
-    !data.Adrs ||
-    !data.Adrs.trim()
+    !data.Adrs?.trim()
   ) {
     throw new Error(
       "آدرس الزامی است.",
     );
   }
 
-  if (
-    !data.FDateInset ||
-    !data.FDateInset.trim()
-  ) {
-    throw new Error(
-      "تاریخ ثبت آدرس الزامی است.",
-    );
-  }
-
-  if (
-    !data.FTimeInsert ||
-    !data.FTimeInsert.trim()
-  ) {
-    throw new Error(
-      "ساعت ثبت آدرس الزامی است.",
-    );
-  }
+  // ---------------------------------------
+  // Create Delivery Address
+  // ---------------------------------------
 
   const delivery =
     await tx.orderDeliveryAddress.create({
       data: {
-        Person_ID:
-          customerId,
 
-        Province_ID:
-          data.provinceId,
+        /*
+         * چون Prisma فیلد Person_ID را
+         * به صورت مستقیم برای create قبول نمی‌کند،
+         * از relation استفاده می‌کنیم.
+         */
+        Person: {
+          connect: {
+            RowID: customerId,
+          },
+        },
+
+        /*
+         * برای Province هم اگر Prisma همین
+         * ساختار relation را دارد، باید connect کنیم.
+         *
+         * اگر Province_ID در مدل create قابل قبول بود،
+         * همین قسمت را نگه دار.
+         */
+        Province: {
+          connect: {
+            RowID: data.provinceId,
+          },
+        },
 
         DeliverToName:
           data.deliverToName.trim(),
@@ -270,7 +275,7 @@ export async function createOrderDelivery(
           data.RowDesc?.trim() ||
           null,
 
-        FDateInset:
+        FDateInsert:
           data.FDateInset,
 
         FTimeInsert:
@@ -284,6 +289,8 @@ export async function createOrderDelivery(
 
   return delivery;
 }
+
+
 
 
 export async function order(
@@ -418,6 +425,8 @@ export async function order(
         DiscountPrice: true,
         MinOrderSite: true,
         MaxOrderSite: true,
+        Main_MeasureUnit_ID: true,
+        Default_MeasureUnit_ID: true
       },
     });
 
@@ -505,6 +514,9 @@ export async function order(
       unitPrice:
         unitPrice,
 
+      mainMeasureUnitId: good.Main_MeasureUnit_ID || 0,
+      defaultMeasureUnitId: good.Default_MeasureUnit_ID || 0,
+
       discountPrice:
         Number(
           good.DiscountPrice ?? 0,
@@ -554,88 +566,62 @@ export async function order(
         const docNo =
           await getNextDocNo(tx);
 
-        const orderH =
-          await tx.orderH.create({
-            data: {
+       const orderH = await tx.orderH.create({
+  data: {
+    DocNo: docNo,
 
-              DocNo:
-                docNo,
+    Person_ID: customer.RowID,
 
-              Person_ID:
-                customer.RowID,
+    OrderDeliveryAddress_ID: delivery.RowID,
 
-              OrderDeliveryAddress_ID:
-                delivery.RowID,
+    MDate: new Date(),
 
-              MDate:
-                getCurrentDateTime(),
+    FDate: getJalaliDate(),
 
-              FDate:
-                getJalaliDate(),
+    FDateInsert: getJalaliDate(),
 
-              FDateInsert:
-                getJalaliDate(),
+    FTimeInsert: getCurrentTime(),
 
-              FTimeInsert:
-                getCurrentTime(),
+    TotalPrice: totalPrice,
 
-              TotalPrice:
-                totalPrice,
+    FinancialYear_ID: financialYearId,
 
-              FinancialYear_ID:
-                financialYearId,
+    TotalDiscountPriceItems: 0,
 
-              TotalDiscountPriceItems: 0,
+    TotalTaxPriceItems: 0,
 
-              TotalTaxPriceItems: 0,
+    TotalIncreasePrice: 1,
 
-              TotalIncreasePrice:
-                1,
+    TotalDecreasePrice: 0,
 
-              TotalDecreasePrice:
-                0,
+    ShippingCost: 0,
 
-              ShippingCost:
-                0,
+    OrderStatus: true,
 
-              OrderStatus:
-                true,
+    Branch_ID: branchId,
 
-              Branch_ID:
-                branchId,
+    DiscountPercent: 0,
 
-              DiscountPercent:
-                0,
+    DiscountPrice: discountPrice,
 
-              DiscountPrice:
-                discountPrice,
+    TaxPercent: 0,
 
-              TaxPercent:
-                0,
+    TaxPrice: taxPrice,
 
-              TaxPrice:
-                taxPrice,
+    PayablePrice: payablePrice,
 
-              PayablePrice:
-                payablePrice,
+    IsOnlineOrder: true,
 
-              IsOnlineOrder:
-                true,
+    Fix_DiscountType_ID: 1,
+  },
 
-              Fix_DiscountType_ID:
-                1,
-            },
-
-            select: {
-              RowID: true,
-
-              DocNo: true,
-
-              Person_ID: true,
-
-              OrderDelivery_ID: true,
-            },
-          });
+  select: {
+    RowID: true,
+    DocNo: true,
+    Person_ID: true,
+    OrderDeliveryAddress_ID: true,
+  },
+});
 
  
         await tx.orderD.createMany({
@@ -671,6 +657,16 @@ export async function order(
 
                 TotalPrice:
                   item.totalPrice,
+                DiscountPrice: 0,
+                DiscountPercent:0,
+                PurchaseUnitPrice: item.unitPrice,
+                PurchaseTotalPrice: item.totalPrice,
+                TaxPercent:0,
+                TaxPrice: 0,
+                SaleUnitPrice: item.unitPrice,
+                MeasureUnit_ID : item.defaultMeasureUnitId,
+                Main_MeasureUnit_ID : item.mainMeasureUnitId,
+                Fix_DiscountType_ID:2
               }),
             ),
         });

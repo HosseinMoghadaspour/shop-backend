@@ -13,7 +13,12 @@ import {
   requireAuth,
 } from "../../middleware/auth.middleware.js";
 
-export const authRoutes = new Hono();
+export const authRoutes =
+  new Hono();
+
+/* -------------------------------------------------------------------------- */
+/* Customer                                                                    */
+/* -------------------------------------------------------------------------- */
 
 authRoutes.post(
   "/customer/request-otp",
@@ -25,6 +30,10 @@ authRoutes.post(
   verifyCustomerOtp,
 );
 
+/* -------------------------------------------------------------------------- */
+/* Admin                                                                       */
+/* -------------------------------------------------------------------------- */
+
 authRoutes.post(
   "/admin/request-otp",
   requestAdminOtp,
@@ -35,12 +44,15 @@ authRoutes.post(
   verifyAdminOtp,
 );
 
+/* -------------------------------------------------------------------------- */
+/* Authenticated                                                               */
+/* -------------------------------------------------------------------------- */
+
 authRoutes.get(
   "/me",
   requireAuth,
   meController,
 );
-
 
 authRoutes.post(
   "/logout",

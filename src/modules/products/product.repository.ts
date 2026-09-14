@@ -52,6 +52,8 @@ const productSelect = {
   InsertServerDateTime: true,
   UpdateServerDateTime: true,
   MDate: true,
+  Main_MeasureUnit_ID: true,
+  Default_MeasureUnit_ID: true,
 } as const;
 
 type ProductRow = Prisma.GoodGetPayload<{ select: typeof productSelect }>;
@@ -94,6 +96,8 @@ function mapProduct(product: ProductRow): PublicProductBase {
     height: product.height == null ? null : Number(product.height),
     length: product.Length == null ? null : Number(product.Length),
     weight: product.Weight == null ? null : Number(product.Weight),
+    mainMeasureUnitId: product.Main_MeasureUnit_ID || null,
+    measureUnitId: product.Default_MeasureUnit_ID || null,
     showInCofferMenu: product.ShowInCofferMenu ?? false,
     createdAt: product.InsertServerDateTime,
     updatedAt: product.UpdateServerDateTime,

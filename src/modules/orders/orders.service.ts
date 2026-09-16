@@ -159,6 +159,25 @@ async function getNextDocNo(
     : 1n;
 }
 
+async function getNextDocNoWhDocH(
+  tx: Prisma.TransactionClient,
+): Promise<bigint> {
+  const lastOrder =
+    await tx.whDocH.findFirst({
+      orderBy: {
+        DocNo: "desc",
+      },
+
+      select: {
+        DocNo: true,
+      },
+    });
+
+  return lastOrder
+    ? BigInt(lastOrder.DocNo) + 1n
+    : 1n;
+}
+
 
 export async function createOrderDelivery(
   tx: Prisma.TransactionClient,
@@ -289,6 +308,43 @@ export async function createOrderDelivery(
 
   return delivery;
 }
+
+
+
+
+async function reserveStock(
+  tx: Prisma.TransactionClient,
+  warehouseId: number,
+  goodId: number,
+  quantity: number,
+): Promise<void> {
+  if (!Number.isInteger(warehouseId) || warehouseId <= 0) {
+    throw new Error("شناسه انبار نامعتبر است.");
+  }
+
+  if (!Number.isInteger(goodId) || goodId <= 0) {
+    throw new Error("شناسه کالا نامعتبر است.");
+  }
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new Error("تعداد کالا نامعتبر است.");
+  }
+
+  const result = await tx.$executeRaw`
+    UPDATE Stock
+    SET Qty = Qty - ${quantity}
+    WHERE WarehouseID = ${warehouseId}
+      AND GoodID = ${goodId}
+      AND Qty >= ${quantity}
+  `;
+
+  if (result !== 1) {
+    throw new Error(
+      `موجودی کالای ${goodId} در انبار کافی نیست.`,
+    );
+  }
+}
+
 
 
 
@@ -551,7 +607,14 @@ export async function order(
   const financialYearId =
     appSetting?.FinancialYear_ID ?? 2;
 
-  const warehouseId = appSetting?.SiteWareHouseID ?? 1;
+  const warehouseId =
+    appSetting?.SiteWareHouseID;
+
+if (!warehouseId) {
+  throw new Error(
+    "انبار فروشگاه برای ثبت سفارش مشخص نشده است.",
+  );
+}
  
   const orderResponse =
     await prisma.$transaction(
@@ -565,8 +628,18 @@ export async function order(
             data.deliveryAddress,
           );
 
-        const docNo =
-          await getNextDocNo(tx);
+        const docNo = await getNextDocNo(tx);
+
+      const docNoWhdocH =await getNextDocNoWhDocH(tx)
+
+      for (const item of orderItems) {
+  await reserveStock(
+    tx,
+    warehouseId,
+    item.goodId,
+    item.quantity,
+  );
+}
 
        const orderH = await tx.orderH.create({
   data: {
@@ -677,7 +750,7 @@ export async function order(
 
         const whDocH = await tx.whDocH.create({
           data: {
-            DocNo: docNo,
+            DocNo: docNoWhdocH,
             Person_ID: customer.RowID,
             MDate: new Date(),
             FDate: getJalaliDate(),

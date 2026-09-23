@@ -47,4 +47,37 @@ export interface Product {
 mainMeasureUnitId: number | null;
   createdAt: Date | null;
   updatedAt: Date | null;
+  stockInfo: ProductStockInfo[];
+}
+
+export interface ProductStockInfo {
+  barcode: string | null;
+  productName: string | null;
+  latinProductName: string | null;
+  productNickName: string | null;
+  quantity: number;
+  warehouseId: number | null;
+  financialYearId: number | null;
+  financialId: number | null;
+  warehouse: string | null;
+  smallestUnit: string | null;
+  categoryName: string | null;
+  branchId: number | null;
+  specialCategory: boolean | null;
+  image: string | null;
+  taxCode: string | null;
+  taxName: string | null;
+  taxPercent: number | null;
+  taxPercentGroup: number | null;
+  taxGroupGoodId: number | null;
+  freeSalePrice: number | null;
+  mid: number | null;
+  mid2: number | null;
+  maxPoint: number | null;
+  minOrder: number | null;
+  weight: number | null;
+  quantityInBox: string | null;
+  width: number | null;
+  height: number | null;
+  length: number | null;
 }

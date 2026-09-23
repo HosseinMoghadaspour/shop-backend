@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
-import type { Prisma } from "../../generated/prisma/client.js";
-import type { Product } from "./product.types.js";
+import { Prisma } from "../../generated/prisma/client.js";
+import type { Product, ProductStockInfo } from "./product.types.js";
 import { findProductImages } from "./product-image.repository.js";
 import { resolveProductsPricing, resolveProductPricing } from "../pricing/price.service.js";
 
@@ -60,6 +60,39 @@ type ProductRow = Prisma.GoodGetPayload<{ select: typeof productSelect }>;
 
 type PublicProductBase = Omit<Product, "images" | "pricing">;
 
+type ProductStockViewRow = {
+  ID: number;
+  ProductBarcode: string | null;
+  ProductName: string | null;
+  LatinProductName: string | null;
+  ProductNickName: string | null;
+  Quantity: unknown;
+  Warehouse_ID: number | null;
+  FinancialYear_ID: number | null;
+  financialid: number | null;
+  Warehouse: string | null;
+  SmallestUnit: string | null;
+  CategoryName: string | null;
+  Branch_ID: number | null;
+  SpecialCategory: boolean | null;
+  IMG_1: Buffer | null;
+  TaxCode: string | null;
+  TaxName: string | null;
+  TaxPercent: unknown;
+  TaxPercentGroup: unknown;
+  TaxGroupGood_ID: number | null;
+  freesaleprice: unknown;
+  MID: unknown;
+  MID2: unknown;
+  Point: unknown;
+  MinOrder: unknown;
+  Weight: unknown;
+  QuantityInBox: string | null;
+  width: unknown;
+  height: unknown;
+  Length: unknown;
+};
+
 function decimalToNumber(value: unknown): number | null {
   if (value == null) return null;
   const number = Number(value);
@@ -101,7 +134,110 @@ function mapProduct(product: ProductRow): PublicProductBase {
     showInCofferMenu: product.ShowInCofferMenu ?? false,
     createdAt: product.InsertServerDateTime,
     updatedAt: product.UpdateServerDateTime,
+    stockInfo: [],
   };
+}
+
+function mapProductStockInfo(row: ProductStockViewRow): ProductStockInfo {
+  return {
+    barcode: row.ProductBarcode,
+    productName: row.ProductName,
+    latinProductName: row.LatinProductName,
+    productNickName: row.ProductNickName,
+    quantity: Number(row.Quantity ?? 0),
+    warehouseId: row.Warehouse_ID,
+    financialYearId: row.FinancialYear_ID,
+    financialId: row.financialid,
+    warehouse: row.Warehouse,
+    smallestUnit: row.SmallestUnit,
+    categoryName: row.CategoryName,
+    branchId: row.Branch_ID,
+    specialCategory: row.SpecialCategory,
+    image: row.IMG_1 ? row.IMG_1.toString("base64") : null,
+    taxCode: row.TaxCode,
+    taxName: row.TaxName,
+    taxPercent: decimalToNumber(row.TaxPercent),
+    taxPercentGroup: decimalToNumber(row.TaxPercentGroup),
+    taxGroupGoodId: row.TaxGroupGood_ID,
+    freeSalePrice: decimalToNumber(row.freesaleprice),
+    mid: decimalToNumber(row.MID),
+    mid2: decimalToNumber(row.MID2),
+    maxPoint: decimalToNumber(row.Point),
+    minOrder: decimalToNumber(row.MinOrder),
+    weight: decimalToNumber(row.Weight),
+    quantityInBox: row.QuantityInBox,
+    width: decimalToNumber(row.width),
+    height: decimalToNumber(row.height),
+    length: decimalToNumber(row.Length),
+  };
+}
+
+async function findProductsStockInfo(productIds: number[]): Promise<Map<number, ProductStockInfo[]>> {
+  const stockInfoByProductId = new Map<number, ProductStockInfo[]>();
+  if (productIds.length === 0) return stockInfoByProductId;
+
+  const appSettings = await prisma.appSettings.findFirst({
+    select: { SiteWareHouseID: true },
+  });
+  const warehouseId = appSettings?.SiteWareHouseID;
+
+  if (warehouseId == null) return stockInfoByProductId;
+
+  const rows = await prisma.$queryRaw<ProductStockViewRow[]>(Prisma.sql`
+    SELECT
+      gv.ID,
+      sr.ProductBarcode,
+      sr.ProductName,
+      sr.LatinProductName,
+      sr.ProductNickName,
+      sr.Quantity,
+      sr.Warehouse_ID,
+      sr.FinancialYear_ID,
+      sr.financialid,
+      sr.Warehouse,
+      sr.SmallestUnit,
+      sr.CategoryName,
+      gv.Branch_ID,
+      gv.SpecialCategory,
+      gv.IMG_1,
+      gv.TaxCode,
+      gv.TaxName,
+      gv.TaxPercent,
+      gv.TaxPercentGroup,
+      gv.TaxGroupGood_ID,
+      gv.freesaleprice,
+      gv.MID,
+      gv.MID2,
+      mw.Point,
+      op.Point AS MinOrder,
+      gv.Weight,
+      gv.QuantityInBox,
+      gv.width,
+      gv.height,
+      gv.Length
+    FROM dbo.GoodView AS gv
+    INNER JOIN dbo.GoodStockReport AS sr ON gv.ID = sr.ID
+    LEFT JOIN dbo.GoodWarehouseMaxCount AS mw
+      ON gv.ID = mw.GoodID AND sr.Warehouse_ID = mw.WarehouseID
+    LEFT JOIN dbo.GoodWarehouseOrderPoint AS op
+      ON op.GoodID = gv.ID AND op.WarehouseID = sr.Warehouse_ID
+    WHERE gv.ID IN (${Prisma.join(productIds)})
+      AND sr.Warehouse_ID = ${warehouseId}
+    ORDER BY gv.ID, sr.Warehouse_ID
+  `);
+
+  for (const row of rows) {
+    const productStockInfo = stockInfoByProductId.get(row.ID) ?? [];
+    productStockInfo.push(mapProductStockInfo(row));
+    stockInfoByProductId.set(row.ID, productStockInfo);
+  }
+
+  return stockInfoByProductId;
+}
+
+async function findProductStockInfo(productId: number): Promise<ProductStockInfo[]> {
+  const stockInfoByProductId = await findProductsStockInfo([productId]);
+  return stockInfoByProductId.get(productId) ?? [];
 }
 
 function buildProductWhere(filters: ProductFilters): Prisma.GoodWhereInput {
@@ -175,11 +311,13 @@ async function loadProducts(where: Prisma.GoodWhereInput, filters: ProductFilter
 export async function findProducts(filters: ProductFilters) {
   const where = buildProductWhere(filters);
   const result = await loadProducts(where, filters);
+  const stockInfoByProductId = await findProductsStockInfo(result.items.map((item) => item.RowID));
 
   return {
     items: result.items.map((item) => ({
       ...mapProduct(item),
       pricing: result.pricing.get(item.RowID)!,
+      stockInfo: stockInfoByProductId.get(item.RowID) ?? [],
       images: [],
     })),
     total: result.total,
@@ -196,12 +334,13 @@ export async function findProductById(
   });
   if (!product) return null;
 
-  const [images, pricing] = await Promise.all([
+  const [images, pricing, stockInfo] = await Promise.all([
     findProductImages(id),
     resolveProductPricing(product, options),
+    findProductStockInfo(id),
   ]);
 
-  return { ...mapProduct(product), pricing, images };
+  return { ...mapProduct(product), pricing, images, stockInfo };
 }
 
 export async function findProductByCode(
@@ -214,12 +353,13 @@ export async function findProductByCode(
   });
   if (!product) return null;
 
-  const [images, pricing] = await Promise.all([
+  const [images, pricing, stockInfo] = await Promise.all([
     findProductImages(product.RowID),
     resolveProductPricing(product, options),
+    findProductStockInfo(product.RowID),
   ]);
 
-  return { ...mapProduct(product), pricing, images };
+  return { ...mapProduct(product), pricing, images, stockInfo };
 }
 
 export async function getAmazingProducts(limit = 12, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {

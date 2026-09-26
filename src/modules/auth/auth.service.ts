@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
+import { create as createPerson } from "../persons/person.repository.js";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
@@ -361,7 +362,7 @@ export async function requestOtp(
     );
   }
 
-  const user =
+  let user =
     kind === "customer"
       ? await findCustomer(
           normalizedPhone,
@@ -369,6 +370,31 @@ export async function requestOtp(
       : await findAdmin(
           normalizedPhone,
         );
+
+  if (!user && kind === "customer") {
+    const existingCustomer =
+      await prisma.person.findFirst({
+        where: {
+          OR: [
+            {
+              MobileNumber:
+                normalizedPhone,
+            },
+            {
+              MobileForSMS:
+                normalizedPhone,
+            },
+          ],
+        },
+      });
+
+    if (!existingCustomer) {
+      user = await createPerson({
+        MobileNumber:
+          normalizedPhone,
+      });
+    }
+  }
 
   /**
    * Do not reveal account existence.
@@ -452,10 +478,22 @@ export async function requestOtp(
     process.env.NODE_ENV !==
     "production"
   ) {
-    console.log(
-      `[AUTH OTP] ${kind} ${normalizedPhone}: ${otp}`,
-    );
+const apiKey = process.env.KAVENEGAR_API_KEY;
 
+const receptor = phone;
+const template = "login";
+
+const url =
+  `https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json` +
+  `?receptor=${encodeURIComponent(receptor)}` +
+  `&token=${encodeURIComponent(otp)}` +
+  `&template=${encodeURIComponent(template)}`;
+
+const response = await fetch(url);
+
+const data = await response.json();
+
+console.log(data);
     return {
       success: true,
       message:

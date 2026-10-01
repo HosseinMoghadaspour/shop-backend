@@ -14,6 +14,7 @@ import { userInfoRoutes } from "../modules/userInfo/userInfo.routes.js";
 import { authRoutes } from "../modules/auth/auth.routes.js";
 import { cartRoutes } from "../modules/cart/cart.routes.js";
 import { ordersRoutes } from "../modules/orders/orders.routes.js";
+import { locationsRoutes } from "../modules/locations/locations.routes.js";
 import paymentRoutes from "../modules/payment/payment.routes.js";
 
 type RouteEnv = {
@@ -73,4 +74,5 @@ routes.route("/users", userInfoRoutes);
 routes.route("/cart", cartRoutes);
 routes.route("/orders", ordersRoutes);
 routes.route("/order", ordersRoutes);
+routes.route("/locations", locationsRoutes);
 routes.route("/api/payment", paymentRoutes);

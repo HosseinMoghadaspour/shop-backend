@@ -1,5 +1,4 @@
 import { Prisma } from "../../generated/prisma/client.js";
-import { MeasureUnitScalarFieldEnum } from "../../generated/prisma/internal/prismaNamespace.js";
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
 
@@ -18,7 +17,6 @@ import type {
 function cartKey(personId: number): string {
   return `cart:customer:${personId}`;
 }
-
 
 async function getCart(
   personId: number,
@@ -41,13 +39,11 @@ async function getCart(
   }
 }
 
-
 async function clearCart(
   personId: number,
 ): Promise<void> {
   await redis.del(cartKey(personId));
 }
-
 
 function getJalaliDate(): string {
   return new Intl.DateTimeFormat(
@@ -62,22 +58,11 @@ function getJalaliDate(): string {
     .replaceAll("-", "/");
 }
 
-
 function getCurrentTime(): string {
   return new Date()
     .toTimeString()
     .slice(0, 5);
 }
-
-
-function getCurrentDateTime(): string {
-  return new Date()
-    .toISOString()
-    .replace("T", " ")
-    .split(".")[0]
-    .replaceAll("-", "/");
-}
-
 
 function getProductPrice(good: {
   SalePrice: number;
@@ -98,7 +83,6 @@ function getProductPrice(good: {
 
   return salePrice;
 }
-
 
 function validateQuantity(
   quantity: number,
@@ -139,7 +123,6 @@ function validateQuantity(
   }
 }
 
-
 async function getNextDocNo(
   tx: Prisma.TransactionClient,
 ): Promise<bigint> {
@@ -177,7 +160,6 @@ async function getNextDocNoWhDocH(
     ? BigInt(lastOrder.DocNo) + 1n
     : 1n;
 }
-
 
 export async function createOrderDelivery(
   tx: Prisma.TransactionClient,
@@ -310,8 +292,6 @@ export async function createOrderDelivery(
 }
 
 
-
-
 async function reserveStock(
   tx: Prisma.TransactionClient,
   warehouseId: number,
@@ -345,8 +325,99 @@ async function reserveStock(
   }
 }
 
+const orderHeaderSelect = {
+  RowID: true,
+  DocNo: true,
+  FDate: true,
+  MDate: true,
+  TotalPrice: true,
+  DiscountPercent: true,
+  DiscountPrice: true,
+  PayablePrice: true,
+  TaxPercent: true,
+  OrderStatus: true,
+} satisfies Prisma.OrderHSelect;
 
+const orderDetailSelect = {
+  OrderH_ID: true,
+  Good_ID: true,
+  MeasureUnit_ID: true,
+  OutputValue: true,
+  UnitPrice: true,
+  TotalPrice: true,
+  PurchaseTotalPrice: true,
+  PurchaseUnitPrice: true,
+} satisfies Prisma.OrderDSelect;
 
+function serializeOrderHeader<T extends { RowID: bigint; DocNo: bigint }>(
+  order: T,
+) {
+  return {
+    ...order,
+    RowID: Number(order.RowID),
+    DocNo: Number(order.DocNo),
+  };
+}
+
+function serializeOrderDetail<T extends { OrderH_ID: bigint }>(
+  order: T,
+) {
+  return {
+    ...order,
+    OrderH_ID: Number(order.OrderH_ID),
+  };
+}
+
+export async function getOrderId(id: number, personId: number) {
+  const order = await prisma.orderH.findFirst({
+    where: {
+      RowID: id,
+      Person_ID: personId,
+    },
+    select: orderHeaderSelect,
+  });
+
+  if (!order) {
+    return { orderH: null, orderD: [] };
+  }
+
+  const details = await prisma.orderD.findMany({
+    where: {
+      OrderH_ID: order.RowID,
+      InputValue: 0,
+    },
+    select: orderDetailSelect,
+  });
+
+  return {
+    orderH: serializeOrderHeader(order),
+    orderD: details.map(serializeOrderDetail),
+  };
+}
+
+export async function getOrderIdPerson(personId: number) {
+  const orders = await prisma.orderH.findMany({
+    where: { Person_ID: personId },
+    orderBy: { RowID: "desc" },
+    select: orderHeaderSelect,
+  });
+
+  const orderIds = orders.map((order) => order.RowID);
+  const details = orderIds.length === 0
+    ? []
+    : await prisma.orderD.findMany({
+        where: {
+          OrderH_ID: { in: orderIds },
+          InputValue: 0,
+        },
+        select: orderDetailSelect,
+      });
+
+  return {
+    orderH: orders.map(serializeOrderHeader),
+    orderD: details.map(serializeOrderDetail),
+  };
+}
 
 
 export async function order(
@@ -383,14 +454,14 @@ export async function order(
     );
   }
 
- 
+
   if (!data.deliveryAddress) {
     throw new Error(
       "اطلاعات آدرس تحویل وارد نشده است.",
     );
   }
 
- 
+
   const cart =
     await getCart(personId);
 
@@ -458,7 +529,7 @@ export async function order(
       uniqueItems.values(),
     );
 
-  
+
   const goods =
     await prisma.good.findMany({
       where: {
@@ -486,7 +557,7 @@ export async function order(
       },
     });
 
- 
+
   const goodsMap =
     new Map(
       goods.map(
@@ -497,7 +568,7 @@ export async function order(
       ),
     );
 
-  
+
   const orderItems: OrderItemResponse[] =
     [];
 
@@ -534,7 +605,7 @@ export async function order(
       maxOrder,
     );
 
-  
+
     const unitPrice =
       getProductPrice(good);
 
@@ -615,12 +686,12 @@ if (!warehouseId) {
     "انبار فروشگاه برای ثبت سفارش مشخص نشده است.",
   );
 }
- 
+
   const orderResponse =
     await prisma.$transaction(
       async (tx) => {
 
-    
+
         const delivery =
           await createOrderDelivery(
             tx,
@@ -673,7 +744,7 @@ if (!warehouseId) {
 
     OrderStatus: true,
 
-    
+
 
     Branch_ID: branchId,
 
@@ -700,7 +771,7 @@ if (!warehouseId) {
   },
 });
 
- 
+
        const orderD = await tx.orderD.createMany({
           data:
             orderItems.map(

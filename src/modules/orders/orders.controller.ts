@@ -2,6 +2,8 @@ import type { Context } from "hono";
 
 import {
   order,
+  getOrderId,
+  getOrderIdPerson,
 } from "./orders.service.js";
 
 import type {
@@ -77,6 +79,49 @@ export async function orderController(
       400,
     );
   }
+}
+
+export async function getOrdersController(c: Context) {
+  const customer = c.get("customer") as { RowID: number } | undefined;
+
+  if (!customer?.RowID) {
+    return c.json(
+      { success: false, message: "احراز هویت مشتری انجام نشده است." },
+      401,
+    );
+  }
+
+  const data = await getOrderIdPerson(customer.RowID);
+  return c.json({ success: true, data });
+}
+
+export async function getOrderByIdController(c: Context) {
+  const customer = c.get("customer") as { RowID: number } | undefined;
+  const id = Number(c.req.param("id"));
+
+  if (!customer?.RowID) {
+    return c.json(
+      { success: false, message: "احراز هویت مشتری انجام نشده است." },
+      401,
+    );
+  }
+
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return c.json(
+      { success: false, message: "شناسه سفارش نامعتبر است." },
+      400,
+    );
+  }
+
+  const data = await getOrderId(id, customer.RowID);
+  if (!data.orderH) {
+    return c.json(
+      { success: false, message: "سفارش پیدا نشد." },
+      404,
+    );
+  }
+
+  return c.json({ success: true, data });
 }
 
 export async function orderDeliveryAddressController(c: Context) {

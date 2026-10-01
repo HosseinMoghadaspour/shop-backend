@@ -72,4 +72,5 @@ routes.route("/persons", personRoutes);
 routes.route("/users", userInfoRoutes);
 routes.route("/cart", cartRoutes);
 routes.route("/orders", ordersRoutes);
+routes.route("/order", ordersRoutes);
 routes.route("/api/payment", paymentRoutes);

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
 
@@ -454,6 +455,7 @@ export async function checkout(
                 personId,
 
               DocNo: docNo,
+              UniqueCode: randomUUID(),
 
               /**
                * TODO:

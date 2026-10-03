@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
@@ -347,6 +348,19 @@ const orderDetailSelect = {
   TotalPrice: true,
   PurchaseTotalPrice: true,
   PurchaseUnitPrice: true,
+
+  good: {
+    select: {
+      RowID: true,
+      RowCode: true,
+      RowName: true,
+      RowNameEN: true,
+      RowNameAlias: true,
+      SalePrice: true,
+      DiscountPrice: true,
+      IMG_1: true,
+    },
+  },
 } satisfies Prisma.OrderDSelect;
 
 function serializeOrderHeader<T extends { RowID: bigint; DocNo: bigint }>(
@@ -359,12 +373,25 @@ function serializeOrderHeader<T extends { RowID: bigint; DocNo: bigint }>(
   };
 }
 
-function serializeOrderDetail<T extends { OrderH_ID: bigint }>(
-  order: T,
-) {
+function serializeOrderDetail<
+  T extends {
+    OrderH_ID: bigint;
+    good: {
+      RowID: number;
+    } | null;
+  },
+>(order: T) {
+  const { good, ...orderDetail } = order;
+
   return {
-    ...order,
+    ...orderDetail,
     OrderH_ID: Number(order.OrderH_ID),
+    Good: good
+      ? {
+          ...good,
+          RowID: Number(good.RowID),
+        }
+      : null,
   };
 }
 
@@ -822,6 +849,7 @@ if (!warehouseId) {
         const whDocH = await tx.whDocH.create({
           data: {
             DocNo: docNoWhdocH,
+            UniqueCode: randomUUID(),
             Person_ID: customer.RowID,
             MDate: new Date(),
             FDate: getJalaliDate(),

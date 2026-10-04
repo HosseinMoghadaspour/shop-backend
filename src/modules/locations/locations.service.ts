@@ -53,3 +53,46 @@ export async function getCitiesByProvince(provinceId: number) {
     countyId: city.County_ID === null ? null : Number(city.County_ID),
   }));
 }
+
+export async function getAddressByPersonId(personId: number) {
+
+    const address = await prisma.person.findFirst({
+        select:{
+            Adress: true,
+            Province_ID: true,
+            City_ID: true,
+        },
+        where:{
+            RowID : personId
+        }
+    })
+
+   const cityName =
+  address?.City_ID != null
+    ? (
+        await prisma.city.findUnique({
+          select: {
+            RowName: true,
+          },
+          where: {
+            RowID: address.City_ID,
+          },
+        })
+      )?.RowName ?? null
+    : null;
+
+    const province = address?.Province_ID !== null ? (
+        await prisma.province.findFirst({
+            select: {
+                RowName: true
+            },
+            where: {
+                RowID: address?.Province_ID,
+            },
+        })
+    )?.RowName ?? null : null;
+
+
+    return ({address , cityName , province})
+
+}

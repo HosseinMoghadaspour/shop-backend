@@ -1794,23 +1794,24 @@ model ChequeRecH {
 }
 
 model City {
-  RowID                 BigInt    @id(map: "PK_City") @default(autoincrement())
-  County_ID             BigInt?
-  RowName               String    @db.NVarChar(100)
-  IsActive              Boolean   @default(true, map: "DF_City_IsActive")
-  RowDesc               String?   @db.NVarChar(500)
-  InsertedBy            Int?      @db.SmallInt
-  UpdatedBy             Int?      @db.SmallInt
-  FDateInsert           String?   @db.Char(10)
-  FDateUpdate           String?   @db.Char(10)
-  FTimeInsert           String?   @db.Char(5)
-  FTimeUpdate           String?   @db.Char(5)
-  InsertServerDateTime  DateTime? @default(now(), map: "DF_City_InsertServerDateTime") @db.DateTime
-  UpdateServerDateTime  DateTime? @db.DateTime
-  RowUpdateVersion      Int?      @default(1, map: "DF_City_RowUpdateVersion") @db.SmallInt
-  UniqueIdentifierValue String?   @db.UniqueIdentifier
-  Reversion             Int?
-  County                County?   @relation(fields: [County_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_City_County")
+  RowID                  BigInt                 @id(map: "PK_City") @default(autoincrement())
+  County_ID              BigInt?
+  RowName                String                 @db.NVarChar(100)
+  IsActive               Boolean                @default(true, map: "DF_City_IsActive")
+  RowDesc                String?                @db.NVarChar(500)
+  InsertedBy             Int?                   @db.SmallInt
+  UpdatedBy              Int?                   @db.SmallInt
+  FDateInsert            String?                @db.Char(10)
+  FDateUpdate            String?                @db.Char(10)
+  FTimeInsert            String?                @db.Char(5)
+  FTimeUpdate            String?                @db.Char(5)
+  InsertServerDateTime   DateTime?              @default(now(), map: "DF_City_InsertServerDateTime") @db.DateTime
+  UpdateServerDateTime   DateTime?              @db.DateTime
+  RowUpdateVersion       Int?                   @default(1, map: "DF_City_RowUpdateVersion") @db.SmallInt
+  UniqueIdentifierValue  String?                @db.UniqueIdentifier
+  Reversion              Int?
+  County                 County?                @relation(fields: [County_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_City_County")
+  orderDeliveryAddresses OrderDeliveryAddress[]
 
   @@unique([RowName, County_ID], map: "UQ_City_RowName")
   @@schema("dbo")
@@ -4081,7 +4082,6 @@ model OrderDeliveryAddress {
   DeliverToName         String?   @db.NVarChar(100)
   DeliverToMobileNumber String?   @db.NVarChar(11)
   DeliverToPhoneNumber  String?   @db.NVarChar(50)
-  City                  String?   @db.NVarChar(100)
   Adrs                  String?   @db.NVarChar(500)
   PostalCode            String?   @db.NVarChar(10)
   IsActive              Boolean   @default(true, map: "DF_OrderDeliveryAddress_IsActive")
@@ -4101,6 +4101,8 @@ model OrderDeliveryAddress {
   Longitude             Float?
   MapZoom               Float?
   AdrsByMap             String?
+  City_ID               BigInt?
+  City                  City?     @relation(fields: [City_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_OrderDeliveryAddress_City")
   Person                Person?   @relation(fields: [Person_ID], references: [RowID], onDelete: Cascade, onUpdate: NoAction, map: "FK_OrderDeliveryAddress_Person")
   Province              Province? @relation(fields: [Province_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_OrderDeliveryAddress_Province")
   OrderH                OrderH[]
@@ -4572,6 +4574,14 @@ model ProformaD {
   UniqueIdentifierValue                                  String?           @db.UniqueIdentifier
   IsSend                                                 Int?              @default(0, map: "DF_ProformaD_IsSend") @db.TinyInt
   TransformRatio                                         Float?
+  Flags                                                  Boolean?
+  BaseInput                                              Float?
+  BaseCalculateInput                                     Float?
+  BaseOutput                                             Float?
+  BaseCalculatedOutput                                   Float?
+  Files                                                  Bytes?            @db.Image
+  ConsumerPrice                                          Float?            @db.Money
+  ManufactorPrice                                        Float?            @db.Money
   Branch                                                 Branch?           @relation(fields: [Branch_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_ProformaD_Branch")
   FinancialYear                                          FinancialYear     @relation(fields: [FinancialYear_ID], references: [RowID], onUpdate: NoAction, map: "FK_ProformaD_FinancialYear")
   Fix_DiscountType                                       Fix_DiscountType? @relation(fields: [Fix_DiscountType_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_ProformaD_Fix_DiscountType")
@@ -4632,6 +4642,11 @@ model ProformaH {
   p2                       String?                    @db.NChar(10)
   p3                       String?                    @db.NChar(10)
   p4                       String?                    @db.NChar(10)
+  DateRecive               DateTime?
+  FDateRecive              String?                    @db.Char(10)
+  Files                    Bytes?                     @db.Image
+  FlagsForPre              Boolean?
+  PreDocNo                 BigInt?
   ProformaD                ProformaD[]
   Branch                   Branch?                    @relation(fields: [Branch_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_ProformaH_Branch")
   FinancialYear            FinancialYear              @relation(fields: [FinancialYear_ID], references: [RowID], onUpdate: NoAction, map: "FK_ProformaH_FinancialYear")

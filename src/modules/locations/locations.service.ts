@@ -56,6 +56,10 @@ export async function getCitiesByProvince(provinceId: number) {
 
 export async function getAddressByPersonId(personId: number) {
     const addresses = await prisma.orderDeliveryAddress.findMany({
+        where: {
+            Person_ID: personId,
+        },
+
         select: {
             RowID: true,
             Person_ID: true,
@@ -66,99 +70,72 @@ export async function getAddressByPersonId(personId: number) {
             PostalCode: true,
             IsActive: true,
             City_ID: true,
-        },
-        where: {
-            Person_ID: personId,
-        },
-    });
 
-    const cityIds = addresses
-        .map((address) => address.City_ID)
-      .filter((id) => id !== null);
+            City: {
+                select: {
+                    RowID: true,
+                    RowName: true,
 
-    if (cityIds.length === 0) {
-        return addresses.map((address) => ({
-            ...address,
-            city: null,
-            province: null,
-        }));
-    }
+                    County: {
+                        select: {
+                            RowID: true,
+                            RowName: true,
 
-    const cities = await prisma.city.findMany({
-        select: {
-            RowID: true,
-            RowName: true,
-            County_ID: true,
-        },
-        where: {
-            RowID: {
-                in: cityIds,
+                            Province: {
+                                select: {
+                                    RowID: true,
+                                    RowName: true,
+                                },
+                            },
+                        },
+                    },
+                },
             },
         },
     });
 
-    const countyIds = cities
-        .map((city) => city.County_ID)
-        .filter((id) => id !== null);
+    return addresses.map((address) => ({
+        id: Number(address.RowID),
 
-    const countys = await prisma.county.findMany({
-        select: {
-            RowID: true,
-            RowName: true,
+        personId: address.Person_ID,
+
+        recipient: {
+            name: address.DeliverToName,
+            mobile: address.DeliverToMobileNumber,
+            phone: address.DeliverToPhoneNumber,
         },
-        where: {
-            RowID: {
-                in: countyIds,
-            },
-        },
-    });
 
-    const provinceIds = countys
-    .map((county)=> county.RowID).filter((id) => id !== null);
+        address: address.Adrs,
 
-     const provinces = await prisma.province.findMany({
-        select: {
-            RowID: true,
-            RowName: true,
-        },
-        where: {
-            RowID: {
-                in: provinceIds,
-            },
-        },
-    });
+        postalCode: address.PostalCode,
 
-    return addresses.map((address) => {
-        const city = cities.find(
-            (item) => item.RowID === address.City_ID
-        );
+        isActive: address.IsActive,
 
-        const county = countys.find(
-            (item) => item.RowID === city?.County_ID
-        );
+        cityId: address.City_ID
+            ? Number(address.City_ID)
+            : null,
 
-        const province = provinces.find(
-            (item)=> item.RowID === county?.RowID
-        )
+        city: address.City
+            ? {
+                  id: Number(address.City.RowID),
+                  name: address.City.RowName,
+              }
+            : null,
 
-        return {
-            ...address,
-            city: city
-                ? {
-                      id: city.RowID,
-                      name: city.RowName,
-                  }
-                : null,
-            county: county ? {
-                id: county.RowID,
-                name: county.RowName
-            } : null,
-            province: province
-                ? {
-                      id: province.RowID,
-                      name: province.RowName,
-                  }
-                : null,
-        };
-    });
+        county: address.City?.County
+            ? {
+                  id: Number(address.City.County.RowID),
+                  name: address.City.County.RowName,
+              }
+            : null,
+
+        province: address.City?.County?.Province
+            ? {
+                  id: Number(
+                      address.City.County.Province.RowID
+                  ),
+                  name: address.City.County.Province.RowName,
+              }
+            : null,
+    }));
 }

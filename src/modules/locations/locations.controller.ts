@@ -75,3 +75,39 @@ export async function listAddress(c:Context) {
     data: address,
   });
 }
+export async function listMyAddresses(c: Context) {
+    try {
+        const customer = c.get("customer") as {
+            RowID: number;
+        } | undefined;
+
+        if (!customer?.RowID) {
+            return c.json(
+                {
+                    success: false,
+                    message: "احراز هویت انجام نشده است",
+                },
+                401,
+            );
+        }
+
+        const addresses = await getAddressByPersonId(
+            customer.RowID,
+        );
+
+        return c.json({
+            success: true,
+            data: addresses,
+        });
+    } catch (error) {
+        console.error(error);
+
+        return c.json(
+            {
+                success: false,
+                message: "خطا در دریافت آدرس‌ها",
+            },
+            500,
+        );
+    }
+}

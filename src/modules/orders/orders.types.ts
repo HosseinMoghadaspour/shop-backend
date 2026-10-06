@@ -27,14 +27,11 @@ export type OrderResponse = {
 };
 
 export type OrderDeliveryAddressRequest = {
-  provinceId: number; 
-  deliverToName: string; 
-  deliverToMobileNumber: string; 
-  deliverToPhoneNumber?: string; 
-  City: string; 
-  Adrs: string; 
-  PostalCode?: string; 
-  RowDesc?: string; 
-  FDateInset: string; 
-  FTimeInsert: string; 
+  cityId: number;
+  deliverToName: string;
+  deliverToMobileNumber: string;
+  deliverToPhoneNumber?: string;
+  Adrs: string;
+  PostalCode?: string;
+  RowDesc?: string;
 };

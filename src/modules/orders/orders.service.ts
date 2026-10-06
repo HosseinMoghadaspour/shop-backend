@@ -181,11 +181,11 @@ export async function createOrderDelivery(
   }
 
   if (
-    !Number.isInteger(data.provinceId) ||
-    data.provinceId <= 0
+    !Number.isInteger(data.cityId) ||
+    data.cityId <= 0
   ) {
     throw new Error(
-      "استان الزامی است.",
+      "شهر الزامی است.",
     );
   }
 
@@ -206,18 +206,57 @@ export async function createOrderDelivery(
   }
 
   if (
-    !data.City?.trim()
-  ) {
-    throw new Error(
-      "شهر الزامی است.",
-    );
-  }
-
-  if (
     !data.Adrs?.trim()
   ) {
     throw new Error(
       "آدرس الزامی است.",
+    );
+  }
+
+  // ---------------------------------------
+  // Get City + County + Province
+  // ---------------------------------------
+
+  const city = await tx.city.findFirst({
+    where: {
+      RowID: data.cityId,
+      IsActive: true,
+    },
+    select: {
+      RowID: true,
+      RowName: true,
+
+      County: {
+        select: {
+          RowID: true,
+          Province_ID: true,
+
+          Province: {
+            select: {
+              RowID: true,
+              RowName: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!city) {
+    throw new Error(
+      "شهر انتخاب‌شده معتبر نیست.",
+    );
+  }
+
+  if (!city.County) {
+    throw new Error(
+      "شهر انتخاب‌شده شهرستان معتبری ندارد.",
+    );
+  }
+
+  if (!city.County.Province) {
+    throw new Error(
+      "شهر انتخاب‌شده استان معتبری ندارد.",
     );
   }
 
@@ -228,28 +267,24 @@ export async function createOrderDelivery(
   const delivery =
     await tx.orderDeliveryAddress.create({
       data: {
-
-        /*
-         * چون Prisma فیلد Person_ID را
-         * به صورت مستقیم برای create قبول نمی‌کند،
-         * از relation استفاده می‌کنیم.
-         */
+        // Customer
         Person: {
           connect: {
             RowID: customerId,
           },
         },
 
-        /*
-         * برای Province هم اگر Prisma همین
-         * ساختار relation را دارد، باید connect کنیم.
-         *
-         * اگر Province_ID در مدل create قابل قبول بود،
-         * همین قسمت را نگه دار.
-         */
+        // Province
         Province: {
           connect: {
-            RowID: data.provinceId,
+            RowID: city.County.Province.RowID,
+          },
+        },
+
+        // City
+        City: {
+          connect: {
+            RowID: city.RowID,
           },
         },
 
@@ -263,9 +298,6 @@ export async function createOrderDelivery(
           data.deliverToPhoneNumber?.trim() ||
           null,
 
-        City:
-          data.City.trim(),
-
         Adrs:
           data.Adrs.trim(),
 
@@ -278,10 +310,10 @@ export async function createOrderDelivery(
           null,
 
         FDateInsert:
-          data.FDateInset,
+          getJalaliDate(),
 
         FTimeInsert:
-          data.FTimeInsert,
+          getCurrentTime(),
       },
 
       select: {

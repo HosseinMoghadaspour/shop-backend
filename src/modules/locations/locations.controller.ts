@@ -77,15 +77,16 @@ export async function listAddress(c:Context) {
 }
 export async function listMyAddresses(c: Context) {
     try {
-        const customer = c.get("customer") as {
+        const customer = c.get("customer",) as {
             RowID: number;
         } | undefined;
+
 
         if (!customer?.RowID) {
             return c.json(
                 {
                     success: false,
-                    message: "احراز هویت انجام نشده است",
+                    message: "احراز هویت انجام نشده است ",
                 },
                 401,
             );

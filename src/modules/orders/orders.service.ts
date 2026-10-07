@@ -89,37 +89,40 @@ function validateQuantity(
   quantity: number,
   minOrder: number | null,
   maxOrder: number | null,
+  weightOrAmount: number | null,
+  goodId: number,
 ): void {
-  if (
-    !Number.isFinite(quantity) ||
-    quantity <= 0
-  ) {
+  if (!Number.isFinite(quantity) || quantity <= 0) {
     throw new Error(
-      "تعداد محصول نامعتبر است",
+      `مقدار کالای ${goodId} نامعتبر است.`,
     );
   }
 
-  if (!Number.isInteger(quantity)) {
+  // WeightOrAmount = 2 یعنی مقدار باید صحیح باشد
+  if (
+    weightOrAmount === 2 &&
+    !Number.isInteger(quantity)
+  ) {
     throw new Error(
-      "تعداد محصول باید عدد صحیح باشد",
+      `مقدار این کالا باید به صورت عدد صحیح وارد شود.`,
     );
   }
 
   if (
     minOrder !== null &&
-    quantity < minOrder
+    quantity < Number(minOrder)
   ) {
     throw new Error(
-      `حداقل تعداد قابل سفارش ${minOrder} است`,
+      `حداقل مقدار سفارش این کالا ${minOrder} است.`,
     );
   }
 
   if (
     maxOrder !== null &&
-    quantity > maxOrder
+    quantity > Number(maxOrder)
   ) {
     throw new Error(
-      `حداکثر تعداد قابل سفارش ${maxOrder} است`,
+      `حداکثر مقدار سفارش این کالا ${maxOrder} است.`,
     );
   }
 }
@@ -618,16 +621,25 @@ export async function order(
       },
 
       select: {
-        RowID: true,
-        RowCode: true,
-        RowName: true,
-        SalePrice: true,
-        DiscountPrice: true,
-        MinOrderSite: true,
-        MaxOrderSite: true,
-        Main_MeasureUnit_ID: true,
-        Default_MeasureUnit_ID: true
-      },
+  RowID: true,
+  RowCode: true,
+  RowName: true,
+  SalePrice: true,
+  DiscountPrice: true,
+  MinOrderSite: true,
+  MaxOrderSite: true,
+
+  Main_MeasureUnit_ID: true,
+  Default_MeasureUnit_ID: true,
+
+  MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit: {
+    select: {
+      RowID: true,
+      RowName: true,
+      WeightOrAmount: true,
+    },
+  },
+},
     });
 
 
@@ -673,10 +685,15 @@ export async function order(
         : null;
 
     validateQuantity(
-      item.quantity,
-      minOrder,
-      maxOrder,
-    );
+  item.quantity,
+ minOrder,
+  maxOrder,
+  good
+    .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+    ?.WeightOrAmount ?? null,
+
+  good.RowID,
+);
 
 
     const unitPrice =

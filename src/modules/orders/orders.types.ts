@@ -1,8 +1,12 @@
 export type OrderHRequest = {
   totalPrice?: number;
-  deliveryAddress: OrderDeliveryAddressRequest;
-};
 
+  deliveryAddress:
+    | {
+        addressId: number;
+      }
+    | OrderDeliveryAddressRequest;
+};
 export type OrderItemResponse = {
     goodId: number;
     goodCode: string;

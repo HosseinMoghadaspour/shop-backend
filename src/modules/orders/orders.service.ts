@@ -325,6 +325,51 @@ export async function createOrderDelivery(
 }
 
 
+async function getOrCreateOrderDelivery(
+  tx: Prisma.TransactionClient,
+  customerId: number,
+  data: OrderHRequest["deliveryAddress"],
+) {
+  // آدرس ذخیره‌شده
+  if ("addressId" in data) {
+    if (
+      !Number.isInteger(data.addressId) ||
+      data.addressId <= 0
+    ) {
+      throw new Error(
+        "شناسه آدرس نامعتبر است.",
+      );
+    }
+
+    const address =
+      await tx.orderDeliveryAddress.findFirst({
+        where: {
+          RowID: BigInt(data.addressId),
+          Person_ID: customerId,
+          IsActive: true,
+        },
+        select: {
+          RowID: true,
+        },
+      });
+
+    if (!address) {
+      throw new Error(
+        "آدرس انتخاب‌شده پیدا نشد یا متعلق به شما نیست.",
+      );
+    }
+
+    return address;
+  }
+
+  // آدرس جدید
+  return createOrderDelivery(
+    tx,
+    customerId,
+    data,
+  );
+}
+
 async function reserveStock(
   tx: Prisma.TransactionClient,
   warehouseId: number,
@@ -751,12 +796,12 @@ if (!warehouseId) {
       async (tx) => {
 
 
-        const delivery =
-          await createOrderDelivery(
-            tx,
-            customer.RowID,
-            data.deliveryAddress,
-          );
+       const delivery =
+  await getOrCreateOrderDelivery(
+    tx,
+    customer.RowID,
+    data.deliveryAddress,
+  );
 
         const docNo = await getNextDocNo(tx);
 

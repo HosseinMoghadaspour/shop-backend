@@ -7,17 +7,25 @@ export type OrderHRequest = {
       }
     | OrderDeliveryAddressRequest;
 };
-export type OrderItemResponse = {
-    goodId: number;
-    goodCode: string;
-    goodName: string;
-    quantity: number;
-    unitPrice: number;
-    discountPrice: number;
-    totalPrice: number;
-    mainMeasureUnitId: number;
-    defaultMeasureUnitId: number;
-};
+export interface OrderItemResponse {
+  goodId: number;
+  goodCode: string;
+  goodName: string;
+  quantity: number;
+  unitPrice: number;
+
+  mainMeasureUnitId: number | null;
+  defaultMeasureUnitId: number | null;
+
+  measureUnit: {
+    id: number;
+    name: string;
+    weightOrAmount: number | null;
+  } | null;
+
+  discountPrice: number;
+  totalPrice: number;
+}
 
 export type OrderResponse = {
   orderHId: number;

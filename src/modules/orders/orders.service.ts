@@ -730,7 +730,25 @@ export async function order(
 
       unitPrice:
         unitPrice,
+      measureUnit: good
+  .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+  ? {
+      id:
+        good
+          .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+          .RowID,
 
+      name:
+        good
+          .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+          .RowName,
+
+      weightOrAmount:
+        good
+          .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+          .WeightOrAmount ?? null,
+    }
+  : null,
       mainMeasureUnitId: good.Main_MeasureUnit_ID || 0,
       defaultMeasureUnitId: good.Default_MeasureUnit_ID || 0,
 

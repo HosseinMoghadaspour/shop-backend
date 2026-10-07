@@ -84,6 +84,13 @@ async function getGood(goodId: number) {
 
       IsActive: true,
       IsShowInOnlineShop: true,
+      MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit: {
+        select: {
+          RowID: true,
+          RowName: true,
+          WeightOrAmount: true,
+        },
+      },
 
       IMG_1: true,
 
@@ -190,6 +197,13 @@ async function buildCartResponse(
 
       IsActive: true,
       IsShowInOnlineShop: true,
+      MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit: {
+        select: {
+          RowID: true,
+          RowName: true,
+          WeightOrAmount: true,
+        },
+      },
 
       GoodImagesWeb: {
         where: {
@@ -233,6 +247,24 @@ async function buildCartResponse(
 
       imageUrl:
         good.GoodImagesWeb[0]?.ImageUrl ?? null,
+
+      measureUnit: good
+        .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+        ? {
+            id:
+              good
+                .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+                .RowID,
+            name:
+              good
+                .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+                .RowName,
+            weightOrAmount:
+              good
+                .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+                .WeightOrAmount ?? null,
+          }
+        : null,
 
       quantity: item.quantity,
 

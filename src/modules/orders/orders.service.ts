@@ -413,6 +413,7 @@ const orderHeaderSelect = {
   DiscountPrice: true,
   PayablePrice: true,
   TaxPercent: true,
+  TaxPrice:true,
   OrderStatus: true,
 } satisfies Prisma.OrderHSelect;
 
@@ -949,7 +950,9 @@ if (!warehouseId) {
             Fix_WhDocType1_ID: 1,
             Fix_WhDocType2_ID: 1,
             Warehouse_ID: warehouseId,
-            RowDesc: data.deliveryAddress.RowDesc,
+            RowDesc: "RowDesc" in data.deliveryAddress
+              ? data.deliveryAddress.RowDesc
+              : undefined,
             RowUpdateVersion:1,
             OrderH_ID: orderH.RowID,
          },

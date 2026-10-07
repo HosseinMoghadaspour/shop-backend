@@ -58,6 +58,7 @@ export async function getAddressByPersonId(personId: number) {
     const addresses = await prisma.orderDeliveryAddress.findMany({
         where: {
             Person_ID: personId,
+            IsActive: true,
         },
 
         select: {

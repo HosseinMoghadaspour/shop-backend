@@ -370,38 +370,6 @@ async function getOrCreateOrderDelivery(
   );
 }
 
-async function reserveStock(
-  tx: Prisma.TransactionClient,
-  warehouseId: number,
-  goodId: number,
-  quantity: number,
-): Promise<void> {
-  if (!Number.isInteger(warehouseId) || warehouseId <= 0) {
-    throw new Error("شناسه انبار نامعتبر است.");
-  }
-
-  if (!Number.isInteger(goodId) || goodId <= 0) {
-    throw new Error("شناسه کالا نامعتبر است.");
-  }
-
-  if (!Number.isFinite(quantity) || quantity <= 0) {
-    throw new Error("تعداد کالا نامعتبر است.");
-  }
-
-  const result = await tx.$executeRaw`
-    UPDATE Stock
-    SET Qty = Qty - ${quantity}
-    WHERE WarehouseID = ${warehouseId}
-      AND GoodID = ${goodId}
-      AND Qty >= ${quantity}
-  `;
-
-  if (result !== 1) {
-    throw new Error(
-      `موجودی کالای ${goodId} در انبار کافی نیست.`,
-    );
-  }
-}
 
 const orderHeaderSelect = {
   RowID: true,
@@ -807,15 +775,6 @@ if (!warehouseId) {
         const docNo = await getNextDocNo(tx);
 
       const docNoWhdocH =await getNextDocNoWhDocH(tx)
-
-      for (const item of orderItems) {
-  await reserveStock(
-    tx,
-    warehouseId,
-    item.goodId,
-    item.quantity,
-  );
-}
 
        const orderH = await tx.orderH.create({
   data: {

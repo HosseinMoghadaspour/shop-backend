@@ -17,7 +17,7 @@ export interface OrderItemResponse {
   mainMeasureUnitId: number | null;
   defaultMeasureUnitId: number | null;
 
-  measureUnit: {
+  unit: {
     id: number;
     name: string;
     weightOrAmount: number | null;

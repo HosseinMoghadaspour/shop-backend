@@ -143,39 +143,29 @@ function validateQuantity(
 async function getNextDocNo(
   tx: Prisma.TransactionClient,
 ): Promise<bigint> {
-  const lastOrder =
-    await tx.orderH.findFirst({
-      orderBy: {
-        DocNo: "desc",
-      },
+  const result = await tx.$queryRaw<
+    { NextDocNo: bigint }[]
+  >`
+    SELECT
+      ISNULL(MAX(DocNo), 0) + 1 AS NextDocNo
+    FROM dbo.OrderH WITH (UPDLOCK, HOLDLOCK)
+  `;
 
-      select: {
-        DocNo: true,
-      },
-    });
-
-  return lastOrder
-    ? BigInt(lastOrder.DocNo) + 1n
-    : 1n;
+  return result[0]?.NextDocNo ?? 1n;
 }
 
 async function getNextDocNoWhDocH(
   tx: Prisma.TransactionClient,
 ): Promise<bigint> {
-  const lastOrder =
-    await tx.whDocH.findFirst({
-      orderBy: {
-        DocNo: "desc",
-      },
+  const result = await tx.$queryRaw<
+    { NextDocNo: bigint }[]
+  >`
+    SELECT
+      ISNULL(MAX(DocNo), 0) + 1 AS NextDocNo
+    FROM dbo.WhDocH WITH (UPDLOCK, HOLDLOCK)
+  `;
 
-      select: {
-        DocNo: true,
-      },
-    });
-
-  return lastOrder
-    ? BigInt(lastOrder.DocNo) + 1n
-    : 1n;
+  return result[0]?.NextDocNo ?? 1n;
 }
 
 export async function createOrderDelivery(
@@ -731,7 +721,7 @@ export async function order(
 
       unitPrice:
         unitPrice,
-      measureUnit: good
+      unit: good
   .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
   ? {
       id:

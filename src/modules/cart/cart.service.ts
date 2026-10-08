@@ -268,23 +268,25 @@ async function buildCartResponse(
       imageUrl:
         good.GoodImagesWeb[0]?.ImageUrl ?? null,
 
-      measureUnit: good
-        .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
-        ? {
-            id:
-              good
-                .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
-                .RowID,
-            name:
-              good
-                .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
-                .RowName,
-            weightOrAmount:
-              good
-                .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
-                .WeightOrAmount ?? null,
-          }
-        : null,
+     unit: good
+  .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+  ? {
+      id:
+        good
+          .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+          .RowID,
+
+      name:
+        good
+          .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+          .RowName,
+
+      weightOrAmount:
+        good
+          .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
+          .WeightOrAmount ?? null,
+    }
+  : null,
 
       quantity: item.quantity,
 

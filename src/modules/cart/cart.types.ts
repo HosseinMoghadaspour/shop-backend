@@ -15,7 +15,7 @@ export type CartItemResponse = {
   rowCode: string;
   rowName: string;
   imageUrl: string | null;
-  measureUnit: {
+  unit: {
     id: number;
     name: string;
     weightOrAmount: number | null;

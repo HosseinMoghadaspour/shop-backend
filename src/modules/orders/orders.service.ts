@@ -499,6 +499,45 @@ export async function getOrderIdPerson(personId: number) {
 }
 
 
+
+async function checkStockForOrder(
+  tx: Prisma.TransactionClient,
+  warehouseId: number,
+  financialYearId: number,
+  items: Array<{
+    goodId: number;
+    quantity: number;
+  }>,
+): Promise<void> {
+  const sortedItems = [...items].sort(
+    (a, b) => a.goodId - b.goodId,
+  );
+
+  for (const item of sortedItems) {
+    const stock = await tx.$queryRaw<
+      { Qty: number }[]
+    >`
+      SELECT
+        Qty
+      FROM dbo.Stock WITH (UPDLOCK, HOLDLOCK)
+      WHERE WarehouseID = ${warehouseId}
+        AND GoodID = ${item.goodId}
+        AND FinancialYear_ID = ${financialYearId}
+    `;
+
+    const availableStock = Number(
+      stock[0]?.Qty ?? 0,
+    );
+
+    if (availableStock < item.quantity) {
+      throw new Error(
+        `موجودی کالای ${item.goodId} کافی نیست. موجودی فعلی: ${availableStock}`,
+      );
+    }
+
+  }
+}
+
 export async function order(
   personId: number,
   data: OrderHRequest,
@@ -796,6 +835,16 @@ if (!warehouseId) {
     tx,
     customer.RowID,
     data.deliveryAddress,
+  );
+
+  await checkStockForOrder(
+    tx,
+    warehouseId,
+    financialYearId,
+    orderItems.map((item) => ({
+      goodId: item.goodId,
+      quantity: item.quantity,
+    })),
   );
 
         const docNo = await getNextDocNo(tx);

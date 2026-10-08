@@ -28,9 +28,13 @@ export interface OrderItemResponse {
 }
 
 export type OrderResponse = {
+  whDocHId: number;
+  whDocD: number;
   orderHId: number;
+  orderD: number;
   docNo: number;
   personId: number;
+  deliveryAddressId: number;
   totalPrice: number;
   discountPrice: number;
   taxPrice: number;

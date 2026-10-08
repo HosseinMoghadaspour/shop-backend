@@ -130,13 +130,32 @@ function validateQuantity(
   },
 ) {
   if (!Number.isFinite(quantity)) {
-    throw new Error("تعداد محصول نامعتبر است.");
+    throw new Error(
+      "تعداد محصول نامعتبر است.",
+    );
   }
 
-  if (quantity <= 0) {
-    throw new Error("تعداد محصول باید بیشتر از صفر باشد.");
+  // حداقل مقدار سفارش
+  if (quantity < 0.5) {
+    throw new Error(
+      "حداقل مقدار سفارش 0.5 است.",
+    );
   }
 
+  // مقدار باید مضرب 0.5 باشد
+  const isHalfStep =
+    Math.abs(
+      quantity * 2 -
+        Math.round(quantity * 2),
+    ) < 0.000001;
+
+  if (!isHalfStep) {
+    throw new Error(
+      "مقدار محصول باید با گام 0.5 وارد شود.",
+    );
+  }
+
+  // حداقل مقدار تعریف‌شده برای محصول
   if (
     good.MinOrderSite !== null &&
     Number(good.MinOrderSite) > 0 &&
@@ -149,6 +168,7 @@ function validateQuantity(
     );
   }
 
+  // حداکثر مقدار تعریف‌شده برای محصول
   if (
     good.MaxOrderSite !== null &&
     Number(good.MaxOrderSite) > 0 &&

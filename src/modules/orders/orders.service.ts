@@ -89,37 +89,50 @@ function validateQuantity(
   quantity: number,
   minOrder: number | null,
   maxOrder: number | null,
-  weightOrAmount: number | null,
   goodId: number,
 ): void {
-  if (!Number.isFinite(quantity) || quantity <= 0) {
+  if (
+    !Number.isFinite(quantity)
+  ) {
     throw new Error(
       `مقدار کالای ${goodId} نامعتبر است.`,
     );
   }
 
-  // WeightOrAmount = 2 یعنی مقدار باید صحیح باشد
-  if (
-    weightOrAmount === 2 &&
-    !Number.isInteger(quantity)
-  ) {
+  // حداقل مقدار سفارش فروشگاه
+  if (quantity < 0.5) {
     throw new Error(
-      `مقدار این کالا باید به صورت عدد صحیح وارد شود.`,
+      `حداقل مقدار سفارش کالای ${goodId} برابر 0.5 است.`,
     );
   }
 
+  // مقدار باید مضرب 0.5 باشد
+  const isHalfStep =
+    Math.abs(
+      quantity * 2 -
+        Math.round(quantity * 2),
+    ) < 0.000001;
+
+  if (!isHalfStep) {
+    throw new Error(
+      `مقدار کالای ${goodId} باید با گام 0.5 باشد.`,
+    );
+  }
+
+  // حداقل مقدار تعریف‌شده برای محصول
   if (
     minOrder !== null &&
-    quantity < Number(minOrder)
+    quantity < minOrder
   ) {
     throw new Error(
       `حداقل مقدار سفارش این کالا ${minOrder} است.`,
     );
   }
 
+  // حداکثر مقدار تعریف‌شده برای محصول
   if (
     maxOrder !== null &&
-    quantity > Number(maxOrder)
+    quantity > maxOrder
   ) {
     throw new Error(
       `حداکثر مقدار سفارش این کالا ${maxOrder} است.`,
@@ -574,14 +587,6 @@ export async function order(
       );
     }
 
-    if (
-      !Number.isInteger(item.quantity)
-    ) {
-      throw new Error(
-        "تعداد محصول باید عدد صحیح باشد",
-      );
-    }
-
     const existing =
       uniqueItems.get(
         item.goodId,
@@ -684,14 +689,10 @@ export async function order(
           )
         : null;
 
-    validateQuantity(
+   validateQuantity(
   item.quantity,
- minOrder,
+  minOrder,
   maxOrder,
-  good
-    .MeasureUnit_Good_Default_MeasureUnit_IDToMeasureUnit
-    ?.WeightOrAmount ?? null,
-
   good.RowID,
 );
 

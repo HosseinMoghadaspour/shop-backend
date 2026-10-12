@@ -18,6 +18,7 @@ export async function findCategories(): Promise<CategoryRecord[]> {
       URL: true,
       GoodCategory_ID: true,
       ShowOrder: true,
+      OnlineCategoryImage: true
     },
 
     orderBy: [
@@ -37,6 +38,7 @@ export async function findCategories(): Promise<CategoryRecord[]> {
     url: category.URL,
     parentId: category.GoodCategory_ID ?? 0,
     sortOrder: category.ShowOrder ?? 999999,
+    onlineCategoryImage: category.OnlineCategoryImage
   }));
 }
 
@@ -55,6 +57,7 @@ export async function findCategoryById(
       RowCode: true,
       RowName: true,
       URL: true,
+      OnlineCategoryImage: true
     },
   });
 
@@ -67,5 +70,6 @@ export async function findCategoryById(
     code: category.RowCode,
     name: category.RowName,
     url: category.URL,
+    onlineCategoryImage: category.OnlineCategoryImage
   };
 }

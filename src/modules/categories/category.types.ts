@@ -3,6 +3,7 @@ export interface CategorySummary {
   code: string;
   name: string;
   url: string | null;
+  onlineCategoryImage: string | null;
 }
 
 export interface CategoryRecord extends CategorySummary {

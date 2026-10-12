@@ -26,6 +26,7 @@ export async function getCategoryTree(): Promise<CategoryNode[]> {
       code: category.code,
       name: category.name,
       url: category.url,
+      onlineCategoryImage: category.onlineCategoryImage,
       children: []
     });
   }

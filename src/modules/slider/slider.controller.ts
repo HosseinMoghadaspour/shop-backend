@@ -4,20 +4,32 @@ import {
   getActiveSliders
 } from "./slider.service.js";
 
+
 export async function listActiveSliders(c: Context) {
   const sliders = await getActiveSliders();
 
-  return c.json({
-    success: true,
-    data: sliders
-  });
+  const serializedSliders = sliders.map((slider) => ({
+    ...slider,
+    RowID:
+      typeof slider.RowID === "bigint"
+        ? slider.RowID.toString()
+        : slider.RowID,
+  }));
+
+  return c.json(serializedSliders);
 }
+
 
 export async function listActiveBanners(c: Context) {
   const banners = await getActiveBanners();
 
-  return c.json({
-    success: true,
-    data: banners
-  });
+  const serializedSliders = banners.map((slider) => ({
+    ...slider,
+    RowID:
+      typeof slider.RowID === "bigint"
+        ? slider.RowID.toString()
+        : slider.RowID,
+  }));
+
+ return c.json(serializedSliders);
 }

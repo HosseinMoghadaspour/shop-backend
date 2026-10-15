@@ -16,6 +16,7 @@ import { cartRoutes } from "../modules/cart/cart.routes.js";
 import { ordersRoutes } from "../modules/orders/orders.routes.js";
 import { locationsRoutes } from "../modules/locations/locations.routes.js";
 import paymentRoutes from "../modules/payment/payment.routes.js";
+import { adminProductRoutes } from "../modules/products/admin/admin-product.routes.js";
 
 type RouteEnv = {
   Variables: {
@@ -76,3 +77,4 @@ routes.route("/orders", ordersRoutes);
 routes.route("/order", ordersRoutes);
 routes.route("/locations", locationsRoutes);
 routes.route("/api/payment", paymentRoutes);
+routes.route("/admin/products", adminProductRoutes);

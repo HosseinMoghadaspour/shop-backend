@@ -29,7 +29,6 @@ export async function findAdminProducts(filters: AdminProductFilters) {
                 { RowName: { contains: filters.search } },
                 { RowCode: { contains: filters.search } },
                 { RowNameAlias: { contains: filters.search } },
-                { SiteName: { contains: filters.search } },
               ],
             },
           ],

@@ -308,21 +308,29 @@ async function loadProducts(where: Prisma.GoodWhereInput, filters: ProductFilter
   };
 }
 
+
 export async function findProducts(filters: ProductFilters) {
   const where = buildProductWhere(filters);
   const result = await loadProducts(where, filters);
-  const stockInfoByProductId = await findProductsStockInfo(result.items.map((item) => item.RowID));
+
+  const productIds = result.items.map((item) => item.RowID);
+
+  const [stockInfoByProductId, ...imagesByProduct] = await Promise.all([
+    findProductsStockInfo(productIds),
+    ...productIds.map((id) => findProductImages(id)),
+  ]);
 
   return {
-    items: result.items.map((item) => ({
+    items: result.items.map((item, index) => ({
       ...mapProduct(item),
       pricing: result.pricing.get(item.RowID)!,
       stockInfo: stockInfoByProductId.get(item.RowID) ?? [],
-      images: [],
+      images: imagesByProduct[index],
     })),
     total: result.total,
   } satisfies { items: Product[]; total: number };
 }
+
 
 export async function findProductById(
   id: number,

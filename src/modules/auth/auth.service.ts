@@ -400,12 +400,18 @@ export async function requestOtp(
    * Do not reveal account existence.
    */
   if (!user) {
-    return {
-      success: true,
-      message:
-        "اگر این شماره قابل استفاده باشد، کد تأیید ارسال خواهد شد.",
-    };
+  if (kind === "admin") {
+    throw new Error(
+      "شما مدیر نیستید و اجازه ورود به پنل مدیریت را ندارید.",
+    );
   }
+
+  return {
+    success: true,
+    message:
+      "اگر این شماره قابل استفاده باشد، کد تأیید ارسال خواهد شد.",
+  };
+}
 
   const cooldownKey =
     otpCooldownKey(

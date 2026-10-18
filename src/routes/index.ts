@@ -8,7 +8,7 @@ import { sliderRoutes } from "../modules/slider/slider.routes.js";
 import { footerRoutes } from "../modules/footer/footer.routes.js";
 import { siteModuleRoutes } from "../modules/site-modules/site-module.routes.js";
 import { homepageRoutes } from "../modules/homepage/homepage.routes.js";
-import { categoryRoutes } from "../modules/categories/category.routes.js";
+import { categoryRoutes } from "../modules/category/category.routes.js";
 import { personRoutes } from "../modules/persons/person.routes.js";
 import { userInfoRoutes } from "../modules/userInfo/userInfo.routes.js";
 import { authRoutes } from "../modules/auth/auth.routes.js";

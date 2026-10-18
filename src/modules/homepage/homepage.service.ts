@@ -4,7 +4,7 @@ import {
   getActiveSliders
 } from "../slider/slider.service.js";
 import { getSiteFooter } from "../footer/footer.service.js";
-import { getRootCategories } from "../categories/category.service.js";
+import { getRootCategories } from "../category/category.service.js";
 
 import {
   findAmazingProducts,

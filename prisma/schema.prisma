@@ -186,7 +186,7 @@ model GoodCategory {
   GoodCategory          GoodCategory?           @relation("GoodCategoryToGoodCategory", fields: [GoodCategory_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_GoodCategory_GoodCategory")
   other_GoodCategory    GoodCategory[]          @relation("GoodCategoryToGoodCategory")
   PrinterCategorySystem PrinterCategorySystem[]
-  IconName              String? @db.NVarChar(50)
+  IconName              String?                 @db.NVarChar(50)
 
   @@unique([RowCode, GoodCategory_ID], map: "UQ_GoodCategory_RowCode")
   @@unique([RowName, GoodCategory_ID], map: "UQ_GoodCategory_RowName")

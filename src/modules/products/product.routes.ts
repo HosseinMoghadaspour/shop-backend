@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
   listAmazingProducts,
   listNewProducts,
+  listBestSellingProducts,
   listProducts,
   showProduct,
   showProductByCode,
@@ -12,5 +13,6 @@ export const productRoutes = new Hono();
 productRoutes.get("/", listProducts);
 productRoutes.get("/amazing", listAmazingProducts);
 productRoutes.get("/new", listNewProducts);
+productRoutes.get("/best-selling", listBestSellingProducts);
 productRoutes.get("/code/:code", showProductByCode);
 productRoutes.get("/:id", showProduct);

@@ -378,7 +378,13 @@ export async function getAmazingProducts(limit = 12, options: Pick<ProductFilter
     take: limit,
   });
   const pricing = await resolveProductsPricing(products, options);
-  return products.map((product) => ({ ...mapProduct(product), pricing: pricing.get(product.RowID)!, images: [] }));
+  return Promise.all(products.map(async (product) => {
+    const [images, stockInfo] = await Promise.all([
+      findProductImages(product.RowID),
+      findProductStockInfo(product.RowID),
+    ]);
+    return { ...mapProduct(product), pricing: pricing.get(product.RowID)!, images, stockInfo };
+  }));
 }
 
 export async function getNewProducts(limit = 12, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {
@@ -389,5 +395,28 @@ export async function getNewProducts(limit = 12, options: Pick<ProductFilters, "
     take: limit,
   });
   const pricing = await resolveProductsPricing(products, options);
-  return products.map((product) => ({ ...mapProduct(product), pricing: pricing.get(product.RowID)!, images: [] }));
+  return Promise.all(products.map(async (product) => {
+    const [images, stockInfo] = await Promise.all([
+      findProductImages(product.RowID),
+      findProductStockInfo(product.RowID),
+    ]);
+    return { ...mapProduct(product), pricing: pricing.get(product.RowID)!, images, stockInfo };
+  }));
+}
+
+export async function findBestSellingProductIds(limit = 12): Promise<number[]> {
+  const sales = await prisma.orderD.groupBy({
+    by: ["Good_ID"],
+    where: {
+      order: { IsOnlineOrder: true },
+      good: { IsActive: true, IsShowInOnlineShop: true },
+    },
+    _sum: { OutputValue: true },
+    orderBy: { _sum: { OutputValue: "desc" } },
+    take: limit,
+  });
+
+  return sales
+    .filter((sale) => sale.Good_ID !== null && sale.Good_ID !== undefined)
+    .map((sale) => Number(sale.Good_ID));
 }

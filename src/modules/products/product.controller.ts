@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import {
   getAmazingProducts,
   getNewProducts,
+  getBestSellingProducts,
   getProductByCode,
   getProductById,
   getProducts,
@@ -60,4 +61,16 @@ export async function listNewProducts(c: Context) {
   const parsed = productLimitSchema.safeParse(c.req.query("limit") ?? 12);
   if (!parsed.success) return c.json({ success: false, error: { code: "INVALID_LIMIT", message: "مقدار limit نامعتبر است" } }, 400);
   return c.json({ success: true, data: await getNewProducts(parsed.data, priceOptions(c)) });
+}
+
+
+export async function listBestSellingProducts(c: Context) {
+  const parsed = productLimitSchema.safeParse(c.req.query("limit") ?? 12);
+  if (!parsed.success) {
+    return c.json({ success: false, error: { code: "INVALID_LIMIT", message: "مقدار limit نامعتبر است" } }, 400);
+  }
+  return c.json({
+    success: true,
+    data: await getBestSellingProducts(parsed.data, priceOptions(c)),
+  });
 }

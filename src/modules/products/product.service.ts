@@ -4,6 +4,7 @@ import {
   findProducts,
   getAmazingProducts as findAmazingProducts,
   getNewProducts as findNewProducts,
+  findBestSellingProductIds,
   type ProductFilters,
 } from "./product.repository.js";
 
@@ -34,4 +35,14 @@ export function getAmazingProducts(limit = 12, options: Pick<ProductFilters, "br
 
 export function getNewProducts(limit = 12, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {
   return findNewProducts(limit, options);
+}
+
+
+export async function getBestSellingProducts(
+  limit = 12,
+  options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {},
+) {
+  const ids = await findBestSellingProductIds(limit);
+  const products = await Promise.all(ids.map((id) => findProductById(id, options)));
+  return products.filter((product) => product !== null);
 }

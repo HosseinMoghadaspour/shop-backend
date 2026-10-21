@@ -18,6 +18,8 @@ import { locationsRoutes } from "../modules/locations/locations.routes.js";
 import paymentRoutes from "../modules/payment/payment.routes.js";
 import { adminProductRoutes } from "../modules/products/admin/admin-product.routes.js";
 import { adminCategoryRoutes } from "../modules/category/admin-category.routes.js";
+import { adminDashboardRoutes } from "../modules/admin/admin-dashboard.routes.js";
+
 
 type RouteEnv = {
   Variables: {
@@ -80,3 +82,4 @@ routes.route("/locations", locationsRoutes);
 routes.route("/api/payment", paymentRoutes);
 routes.route("/admin/products", adminProductRoutes);
 routes.route("/admin/categories", adminCategoryRoutes)
+routes.route("/admin/dashboard", adminDashboardRoutes);

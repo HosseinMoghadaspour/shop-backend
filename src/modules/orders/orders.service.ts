@@ -579,6 +579,19 @@ export async function order(
     );
   }
 
+  if (!Number.isInteger(data.paymentMethodId) || data.paymentMethodId <= 0) {
+    throw new Error("لطفاً روش پرداخت را انتخاب کنید.");
+  }
+
+  const paymentMethod = await prisma.fix_OrderPaymentMethod.findFirst({
+    where: { RowID: data.paymentMethodId, IsActive: true },
+    select: { RowID: true, EnName: true },
+  });
+
+  if (!paymentMethod) {
+    throw new Error("روش پرداخت انتخاب‌شده معتبر یا فعال نیست.");
+  }
+
 
   const cart =
     await getCart(personId);
@@ -898,6 +911,11 @@ if (!warehouseId) {
     PayablePrice: payablePrice,
 
     IsOnlineOrder: true,
+
+    Fix_OrderPaymentMethod_ID: paymentMethod.RowID,
+
+    Fix_OrderPaymentConfirmationStatus_ID:
+      paymentMethod.EnName === "payInPlace" ? 2 : 1,
 
     Fix_DiscountType_ID: 1,
   },

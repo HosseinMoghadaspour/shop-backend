@@ -19,6 +19,7 @@ import paymentRoutes from "../modules/payment/payment.routes.js";
 import { adminProductRoutes } from "../modules/products/admin/admin-product.routes.js";
 import { adminCategoryRoutes } from "../modules/category/admin-category.routes.js";
 import { adminDashboardRoutes } from "../modules/admin/admin-dashboard.routes.js";
+import { adminSliderRoutes } from "../modules/slider/admin-slider.routes.js";
 
 
 type RouteEnv = {
@@ -83,3 +84,4 @@ routes.route("/api/payment", paymentRoutes);
 routes.route("/admin/products", adminProductRoutes);
 routes.route("/admin/categories", adminCategoryRoutes)
 routes.route("/admin/dashboard", adminDashboardRoutes);
+routes.route("/admin/sliders", adminSliderRoutes);

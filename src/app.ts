@@ -57,7 +57,7 @@ app.get("/uploads/products/:filename", async (c) => {
 
 app.get("/uploads/sliders/:filename", async (c) => {
   const filename = c.req.param("filename");
-  if (!/^[\\w-]+\\.webp$/.test(filename)) return c.notFound();
+  if (!/^[\w-]+\.webp$/.test(filename)) return c.notFound();
 
   try {
     const image = await readFile(path.join(sliderUploadsDir, filename));

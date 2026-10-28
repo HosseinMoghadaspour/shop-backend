@@ -17,6 +17,7 @@ async function findByType(type: number): Promise<Slider[] > {
       UrlImage: true,
       DescImage: true,
       DescBut: true,
+      ButtonColor: true,
       UrlSend: true,
       Status: true,
       Type: true,

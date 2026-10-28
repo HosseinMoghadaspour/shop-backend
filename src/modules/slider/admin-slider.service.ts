@@ -18,6 +18,7 @@ export async function listAdminSliders() {
       UrlImage: true,
       DescImage: true,
       DescBut: true,
+      ButtonColor: true,
       UrlSend: true,
       Status: true,
       Type: true,
@@ -30,6 +31,7 @@ export async function createAdminSlider(data: {
   DescImage: string | null;
   Description: string | null;
   DescBut: string | null;
+  ButtonColor: string | null;
   UrlSend: string | null;
   Status: boolean;
 }) {
@@ -38,6 +40,7 @@ export async function createAdminSlider(data: {
       DescImage: data.DescImage,
       Description: data.Description,
       DescBut: data.DescBut,
+      ButtonColor: data.ButtonColor,
       UrlSend: data.UrlSend,
       Status: false,
       Type: 1,
@@ -48,6 +51,7 @@ export async function createAdminSlider(data: {
       UrlImage: true,
       DescImage: true,
       DescBut: true,
+      ButtonColor: true,
       UrlSend: true,
       Status: true,
       Type: true,
@@ -62,6 +66,7 @@ export async function updateAdminSlider(
     DescImage: string | null;
     Description: string | null;
     DescBut: string | null;
+    ButtonColor: string | null;
     UrlSend: string | null;
     Status: boolean;
   },
@@ -83,6 +88,7 @@ export async function updateAdminSlider(
       UrlImage: true,
       DescImage: true,
       DescBut: true,
+      ButtonColor: true,
       UrlSend: true,
       Status: true,
       Type: true,

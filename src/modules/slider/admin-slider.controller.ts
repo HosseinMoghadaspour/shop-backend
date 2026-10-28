@@ -25,10 +25,15 @@ function parsePayload(body: Record<string, unknown>) {
   if (body.Status !== undefined && typeof body.Status !== "boolean") {
     throw new AdminSliderError("وضعیت اسلایدر معتبر نیست.");
   }
+  const buttonColor = readText(body.ButtonColor, 7);
+  if (buttonColor !== null && !/^#[0-9a-fA-F]{6}$/.test(buttonColor)) {
+    throw new AdminSliderError("رنگ دکمه باید یک کد رنگ معتبر مثل #0F766E باشد.");
+  }
   return {
     DescImage: readText(body.DescImage, 2000),
     Description: readText(body.Description, 10000),
     DescBut: readText(body.DescBut, 100),
+    ButtonColor: buttonColor,
     UrlSend: readText(body.UrlSend, 2000),
     Status: body.Status === true,
   };

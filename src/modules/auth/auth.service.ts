@@ -113,11 +113,11 @@ function sessionOwnerKey(
 /* -------------------------------------------------------------------------- */
 
 function getAuthSecret(): string {
-  // AUTH_SESSION_SECRET is the documented variable. Keep AUTH_SECRET as
-  // a fallback for deployments that already use the legacy name.
+  // Prefer the legacy variable first to preserve existing session hashes
+  // on deployments that already have AUTH_SECRET configured.
   const secret =
-    process.env.AUTH_SESSION_SECRET ??
-    process.env.AUTH_SECRET;
+    process.env.AUTH_SECRET ??
+    process.env.AUTH_SESSION_SECRET;
 
   if (!secret) {
     if (process.env.NODE_ENV === "production") {

@@ -3,6 +3,7 @@ export interface Slider {
   UrlImage: string | null;
   DescImage: string | null;
   DescBut: string | null;
+  ButtonColor: string | null;
   UrlSend: string | null;
   Status: boolean | null;
   Type: number | null;

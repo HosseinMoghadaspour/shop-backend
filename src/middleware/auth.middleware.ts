@@ -135,7 +135,7 @@ async function authenticate(
       );
     }
 
-   const session = await refreshSession(token);
+    const session = await refreshSession(token);
 
     if (!session) {
       return c.json(
@@ -146,6 +146,37 @@ async function authenticate(
         },
         401,
       );
+    }
+
+    // Refresh the browser cookie together with the Redis idle timeout.
+    // Do not issue a cookie when this request authenticated via Bearer token.
+    const authorization = c.req.header("Authorization");
+    const cookieHeader = c.req.header("Cookie") ?? "";
+    const hasSessionCookie = cookieHeader
+      .split(";")
+      .some((part) => part.trim().startsWith(`${SESSION_COOKIE_NAME}=`));
+
+    if (
+      !authorization?.startsWith("Bearer ") &&
+      hasSessionCookie
+    ) {
+      const maxAge = Math.max(
+        1,
+        Math.ceil((session.idleExpiresAt - Date.now()) / 1000),
+      );
+      const parts = [
+        `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
+        "Path=/",
+        `Max-Age=${maxAge}`,
+        "HttpOnly",
+        "SameSite=Lax",
+      ];
+
+      if (process.env.NODE_ENV === "production") {
+        parts.push("Secure");
+      }
+
+      c.header("Set-Cookie", parts.join("; "), { append: true });
     }
 
     if (

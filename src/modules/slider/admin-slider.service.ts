@@ -66,6 +66,7 @@ export async function updateAdminSlider(
     DescImage: string | null;
     Description: string | null;
     DescBut: string | null;
+    ButtonColor: string | null;
     UrlSend: string | null;
     Status: boolean;
   },

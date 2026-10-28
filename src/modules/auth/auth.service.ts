@@ -53,11 +53,13 @@ const CUSTOMER_ABSOLUTE_SECONDS =
 const CUSTOMER_IDLE_SECONDS =
   60 * 60 * 24 * 7;
 
+// Admin sessions expire after 30 days without activity.
+// The one-year absolute cap is a safety limit for continuously active sessions.
 const ADMIN_ABSOLUTE_SECONDS =
-  60 * 60 * 24 * 7;
+  60 * 60 * 24 * 365;
 
 const ADMIN_IDLE_SECONDS =
-  60 * 60 * 8;
+  60 * 60 * 24 * 30;
 
 const MAX_USER_AGENT_LENGTH = 512;
 
@@ -111,12 +113,16 @@ function sessionOwnerKey(
 /* -------------------------------------------------------------------------- */
 
 function getAuthSecret(): string {
-  const secret = process.env.AUTH_SECRET;
+  // AUTH_SESSION_SECRET is the documented variable. Keep AUTH_SECRET as
+  // a fallback for deployments that already use the legacy name.
+  const secret =
+    process.env.AUTH_SESSION_SECRET ??
+    process.env.AUTH_SECRET;
 
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
       throw new Error(
-        "AUTH_SECRET is required in production.",
+        "AUTH_SESSION_SECRET (or legacy AUTH_SECRET) is required in production.",
       );
     }
 

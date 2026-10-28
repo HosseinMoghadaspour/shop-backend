@@ -672,6 +672,7 @@ model SiteSlider {
   UrlImage    String?  @db.NText
   DescImage   String?  @db.NVarChar(Max)
   DescBut     String?  @db.NVarChar(100)
+  ButtonColor String?  @db.NVarChar(7)
   UrlSend     String?  @db.NText
   Status      Boolean?
   Type        Int?

@@ -25,6 +25,12 @@ app.onError(errorHandler);
 
 const sliderUploadsDir = path.resolve(process.cwd(), "uploads", "sliders");
 
+const footerUploadsDir = path.resolve(
+  process.cwd(),
+  "uploads",
+  "footer",
+);
+
 const productUploadsDir = path.resolve(
   process.cwd(),
   "uploads",
@@ -74,3 +80,27 @@ app.get("/uploads/sliders/:filename", async (c) => {
 });
 
 app.route("/", routes);
+
+app.get("/uploads/footer/:filename", async (c) => {
+  const filename = c.req.param("filename");
+
+  if (!/^[\w-]+\.webp$/.test(filename)) {
+    return c.notFound();
+  }
+
+  try {
+    const image = await readFile(
+      path.join(footerUploadsDir, filename),
+    );
+
+    return new Response(new Uint8Array(image), {
+      headers: {
+        "Content-Type": "image/webp",
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch {
+    return c.notFound();
+  }
+});

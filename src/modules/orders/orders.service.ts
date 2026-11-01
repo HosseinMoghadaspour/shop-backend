@@ -596,6 +596,7 @@ async function checkStockForOrder(
 async function createOrderInternal(
   personId: number,
   data: OrderHRequest,
+  idempotencyKey: string,
 ): Promise<OrderResponse> {
 
   if (
@@ -1259,6 +1260,10 @@ if (previousOrder) {
 
   return withCustomerOrderLock(
     personId,
-    () => createOrderInternal(personId, data),
+    () => createOrderInternal(
+  personId,
+  data,
+  idempotencyKey,
+),
   );
 }

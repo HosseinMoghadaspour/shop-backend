@@ -46,6 +46,61 @@ async function clearCart(
   await redis.del(cartKey(personId));
 }
 
+
+export class OrderInProgressError extends Error {
+  constructor() {
+    super("درخواست ثبت سفارش شما در حال پردازش است. لطفاً چند لحظه صبر کنید.");
+    this.name = "OrderInProgressError";
+  }
+}
+
+async function withCustomerOrderLock<T>(
+  personId: number,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const lockKey = `order:lock:customer:${personId}`;
+  const lockToken = randomUUID();
+
+  // فقط یک درخواست برای هر مشتری اجازه ورود دارد.
+  const acquired = await redis.set(
+    lockKey,
+    lockToken,
+    {
+      NX: true,
+      EX: 300,
+    },
+  );
+
+  if (acquired !== "OK") {
+    throw new OrderInProgressError();
+  }
+
+  try {
+    return await callback();
+  } finally {
+    // فقط مالک قفل اجازه آزادکردن آن را دارد.
+    try {
+      await redis.eval(
+        `
+          if redis.call("GET", KEYS[1]) == ARGV[1] then
+            return redis.call("DEL", KEYS[1])
+          else
+            return 0
+          end
+        `,
+        {
+          keys: [lockKey],
+          arguments: [lockToken],
+        },
+      );
+    } catch (error) {
+      console.error("Failed to release order lock:", error);
+      // اگر آزادسازی شکست بخورد، قفل حداکثر پس از ۵ دقیقه منقضی می‌شود.
+    }
+  }
+}
+
+
 function getJalaliDate(): string {
   return new Intl.DateTimeFormat(
     "fa-IR-u-nu-latn",
@@ -538,11 +593,10 @@ async function checkStockForOrder(
   }
 }
 
-export async function order(
+async function createOrderInternal(
   personId: number,
   data: OrderHRequest,
 ): Promise<OrderResponse> {
-
 
   if (
     !Number.isInteger(personId) ||
@@ -918,6 +972,7 @@ if (!warehouseId) {
       paymentMethod.EnName === "payInPlace" ? 2 : 1,
 
     Fix_DiscountType_ID: 1,
+    UniqueIdentifierValue: idempotencyKey,
   },
 
   select: {
@@ -1106,4 +1161,104 @@ if (!warehouseId) {
   await clearCart(personId);
 
   return orderResponse;
+}
+
+
+
+async function findOrderByIdempotencyKey(
+  personId: number,
+  idempotencyKey: string,
+): Promise<OrderResponse | null> {
+  const existingOrder = await prisma.orderH.findFirst({
+    where: {
+      Person_ID: personId,
+      UniqueIdentifierValue: idempotencyKey,
+    },
+    select: {
+      RowID: true,
+      DocNo: true,
+      Person_ID: true,
+      OrderDeliveryAddress_ID: true,
+      TotalPrice: true,
+      DiscountPrice: true,
+      TaxPrice: true,
+      PayablePrice: true,
+    },
+  });
+
+  if (!existingOrder) {
+    return null;
+  }
+
+  const warehouseDocument = await prisma.whDocH.findFirst({
+    where: {
+      OrderH_ID: existingOrder.RowID,
+    },
+    select: {
+      RowID: true,
+    },
+  });
+
+  if (!warehouseDocument) {
+    throw new Error(
+      "سفارش قبلی پیدا شد اما سند انبار مرتبط با آن موجود نیست.",
+    );
+  }
+
+  const [orderD, whDocD] = await Promise.all([
+    prisma.orderD.count({
+      where: {
+        OrderH_ID: existingOrder.RowID,
+      },
+    }),
+
+    prisma.whDocD.count({
+      where: {
+        WhDocH_ID: warehouseDocument.RowID,
+      },
+    }),
+  ]);
+
+  return {
+    orderHId: Number(existingOrder.RowID),
+    whDocHId: warehouseDocument.RowID,
+    orderD,
+    whDocD,
+    docNo: Number(existingOrder.DocNo),
+    personId: existingOrder.Person_ID!,
+    deliveryAddressId: Number(
+      existingOrder.OrderDeliveryAddress_ID,
+    ),
+    totalPrice: Number(existingOrder.TotalPrice ?? 0),
+    discountPrice: Number(existingOrder.DiscountPrice ?? 0),
+    taxPrice: Number(existingOrder.TaxPrice ?? 0),
+    payablePrice: Number(existingOrder.PayablePrice ?? 0),
+    items: [],
+  };
+}
+
+
+
+export async function order(
+  personId: number,
+  data: OrderHRequest,
+  idempotencyKey: string,
+): Promise<OrderResponse> {
+  if (!Number.isInteger(personId) || personId <= 0) {
+    throw new Error("شناسه مشتری نامعتبر است.");
+  }
+
+  const previousOrder = await findOrderByIdempotencyKey(
+  personId,
+  idempotencyKey,
+);
+
+if (previousOrder) {
+  return previousOrder;
+}
+
+  return withCustomerOrderLock(
+    personId,
+    () => createOrderInternal(personId, data),
+  );
 }

@@ -4,6 +4,7 @@ import {
   order,
   getOrderId,
   getOrderIdPerson,
+  OrderInProgressError
 } from "./orders.service.js";
 
 import type {
@@ -31,7 +32,25 @@ export async function orderController(
       );
     }
 
-  const body = await c.req.json<OrderHRequest>();
+
+    const idempotencyKey = c.req.header("Idempotency-Key");
+
+if (
+  !idempotencyKey ||
+  !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    idempotencyKey,
+  )
+) {
+  return c.json(
+    {
+      success: false,
+      message: "شناسه درخواست نامعتبر است.",
+    },
+    400,
+  );
+}
+
+    const body = await c.req.json<OrderHRequest>();
     if (!body) {
       return c.json(
         {
@@ -43,11 +62,11 @@ export async function orderController(
       );
     }
 
-    const result =
-      await order(
-        customer.RowID,
-        body,
-      );
+  const result = await order(
+  customer.RowID,
+  body,
+  idempotencyKey,
+);
 
     return c.json(
       {
@@ -65,6 +84,16 @@ export async function orderController(
       "Checkout error:",
       error,
     );
+
+    if (error instanceof OrderInProgressError) {
+  return c.json(
+    {
+      success: false,
+      message: error.message,
+    },
+    409,
+  );
+}
 
     const message =
       error instanceof Error

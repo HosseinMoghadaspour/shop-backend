@@ -5,6 +5,7 @@ import {
   paymentMethods,
   paymentStatusDetail,
   paymentStatuses,
+  publicBankAccounts,
   startOrderPayment
 } from "./payment.controller.js";
 import { requireCustomerAuth } from "../../middleware/auth.middleware.js";
@@ -36,6 +37,11 @@ paymentRoutes.post(
   "/order/:orderId",
   requireCustomerAuth,
   startOrderPayment,
+);
+
+paymentRoutes.get(
+  "/bank-accounts",
+  publicBankAccounts,
 );
 
 export default paymentRoutes;

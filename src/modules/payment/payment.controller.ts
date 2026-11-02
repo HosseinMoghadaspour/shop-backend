@@ -4,6 +4,7 @@ import {
   getPaymentMethods,
   getPaymentStatus,
   getPaymentStatuses,
+  getPublicBankAccounts
 } from "./payment.service.js";
 import { startPayment } from "./payment.service.js";
 
@@ -199,6 +200,30 @@ export async function startOrderPayment(c: Context) {
             : "خطا در شروع پرداخت.",
       },
       400,
+    );
+  }
+}
+
+export async function publicBankAccounts(c: Context) {
+  try {
+    const accounts = await getPublicBankAccounts();
+
+    return c.json({
+      success: true,
+      data: accounts,
+    });
+  } catch (error) {
+    console.error(
+      "GET /payment/bank-accounts error:",
+      error,
+    );
+
+    return c.json(
+      {
+        success: false,
+        message: "خطا در دریافت اطلاعات حساب‌های بانکی.",
+      },
+      500,
     );
   }
 }

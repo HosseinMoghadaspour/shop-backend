@@ -462,3 +462,33 @@ export async function startPayment(
       "درخواست پرداخت اینترنتی آماده ارسال به درگاه است.",
   };
 }
+
+
+export async function getPublicBankAccounts() {
+  const accounts = await prisma.bankAccount.findMany({
+    where: {
+      IsActive: true,
+      OnlineShop_IsShow: true,
+    },
+
+    select: {
+      RowID: true,
+      OnlineShop_BankName: true,
+      OnlineShop_AccountNumber: true,
+      OnlineShop_CardNumber: true,
+      OnlineShop_AccountOwnerName: true,
+    },
+
+    orderBy: {
+      RowID: "asc",
+    },
+  });
+
+  return accounts.map((account) => ({
+    id: account.RowID,
+    bankName: account.OnlineShop_BankName,
+    accountNumber: account.OnlineShop_AccountNumber,
+    cardNumber: account.OnlineShop_CardNumber,
+    accountOwnerName: account.OnlineShop_AccountOwnerName,
+  }));
+}

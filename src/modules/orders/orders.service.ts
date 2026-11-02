@@ -1249,21 +1249,46 @@ export async function order(
     throw new Error("شناسه مشتری نامعتبر است.");
   }
 
-  const previousOrder = await findOrderByIdempotencyKey(
-  personId,
-  idempotencyKey,
-);
+  if (!idempotencyKey?.trim()) {
+    throw new Error("کلید یکتای سفارش ارسال نشده است.");
+  }
 
-if (previousOrder) {
-  return previousOrder;
-}
+  try {
+    return await withCustomerOrderLock(personId, async () => {
+      // ابتدا بررسی می‌کنیم آیا این سفارش قبلاً ثبت شده است یا نه
+      const previousOrder = await findOrderByIdempotencyKey(
+        personId,
+        idempotencyKey,
+      );
 
-  return withCustomerOrderLock(
-    personId,
-    () => createOrderInternal(
-  personId,
-  data,
-  idempotencyKey,
-),
-  );
+      if (previousOrder) {
+        return previousOrder;
+      }
+
+      // در صورت نبود سفارش قبلی، سفارش جدید ثبت می‌شود
+      return createOrderInternal(
+        personId,
+        data,
+        idempotencyKey,
+      );
+    });
+  } catch (error) {
+    // اگر دیتابیس خطای Unique Constraint برگرداند
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      // بررسی می‌کنیم آیا سفارش با همین کلید ثبت شده است
+      const previousOrder = await findOrderByIdempotencyKey(
+        personId,
+        idempotencyKey,
+      );
+
+      if (previousOrder) {
+        return previousOrder;
+      }
+    }
+
+    throw error;
+  }
 }

@@ -38,10 +38,11 @@ routes.use(
       "http://localhost:5173",
       "http://localhost:3000",
     ],
-    allowHeaders: [
-      "Content-Type",
-      "Authorization",
-    ],
+  allowHeaders: [
+  "Content-Type",
+  "Authorization",
+  "Idempotency-Key",
+],
     allowMethods: [
       "GET",
       "POST",

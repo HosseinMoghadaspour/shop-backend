@@ -22,6 +22,7 @@ import { adminDashboardRoutes } from "../modules/admin/admin-dashboard.routes.js
 import { adminSliderRoutes } from "../modules/slider/admin-slider.routes.js";
 import { adminFooterRoutes } from "../modules/footer/admin-footer.routes.js";
 import { adminBankAccountsRoutes } from "../modules/admin/bank-accounts/bank-accounts.routes.js";
+import { adminPaymentReceiptsRoutes } from "../modules/admin/payment-receipts/payment-receipts.routes.js";
 
 type RouteEnv = {
   Variables: {
@@ -89,3 +90,4 @@ routes.route("/admin/dashboard", adminDashboardRoutes);
 routes.route("/admin/sliders", adminSliderRoutes);
 routes.route("/admin/footer", adminFooterRoutes);
 routes.route("/admin/bank-accounts", adminBankAccountsRoutes);
+routes.route("/admin/payment-receipts", adminPaymentReceiptsRoutes);

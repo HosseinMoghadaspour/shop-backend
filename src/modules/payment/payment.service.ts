@@ -22,6 +22,17 @@ export const PAYMENT_STATUS = {
   NOT_PAID: 4,
 } as const;
 
+export interface CardToCardReceiptInput {
+  bankAccountId: number;
+  amount: number;
+  trackingNumber: string;
+  year: string;
+  month: string;
+  day: string;
+  hour: string;
+  minute: string;
+  lastFourDigits: string;
+}
 
 
 export async function getPaymentMethods(): Promise<
@@ -491,4 +502,148 @@ export async function getPublicBankAccounts() {
     cardNumber: account.OnlineShop_CardNumber,
     accountOwnerName: account.OnlineShop_AccountOwnerName,
   }));
+}
+
+function normalizeDigits(value: string): string {
+  return value
+    .replace(/[۰-۹]/g, (digit) =>
+      String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)),
+    )
+    .replace(/[٠-٩]/g, (digit) =>
+      String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)),
+    );
+}
+
+export async function submitCardToCardReceipt(
+  customerId: number,
+  orderId: bigint,
+  data: CardToCardReceiptInput,
+) {
+  if (!Number.isInteger(customerId) || customerId <= 0) {
+    throw new Error("شناسه مشتری نامعتبر است.");
+  }
+
+  const trackingNumber = data.trackingNumber.trim();
+  const year = normalizeDigits(data.year);
+  const month = normalizeDigits(data.month);
+  const day = normalizeDigits(data.day);
+  const hour = normalizeDigits(data.hour);
+  const minute = normalizeDigits(data.minute);
+  const lastFourDigits = normalizeDigits(data.lastFourDigits);
+
+  if (!trackingNumber || trackingNumber.length > 50) {
+    throw new Error("شماره پیگیری معتبر نیست.");
+  }
+
+  if (!Number.isFinite(data.amount) || data.amount <= 0) {
+    throw new Error("مبلغ واریزی معتبر نیست.");
+  }
+
+  if (!/^\d{4}$/.test(year)) {
+    throw new Error("سال واریز معتبر نیست.");
+  }
+
+  if (!/^(0[1-9]|1[0-2])$/.test(month)) {
+    throw new Error("ماه واریز معتبر نیست.");
+  }
+
+  if (!/^(0[1-9]|[12]\d|3[01])$/.test(day)) {
+    throw new Error("روز واریز معتبر نیست.");
+  }
+
+  if (!/^([01]\d|2[0-3])$/.test(hour)) {
+    throw new Error("ساعت واریز معتبر نیست.");
+  }
+
+  if (!/^[0-5]\d$/.test(minute)) {
+    throw new Error("دقیقه واریز معتبر نیست.");
+  }
+
+  if (!/^\d{4}$/.test(lastFourDigits)) {
+    throw new Error("چهار رقم آخر کارت معتبر نیست.");
+  }
+
+  const order = await prisma.orderH.findFirst({
+    where: {
+      RowID: orderId,
+      Person_ID: customerId,
+    },
+    select: {
+      RowID: true,
+      PayablePrice: true,
+      Fix_OrderPaymentConfirmationStatus_ID: true,
+      Fix_OrderPaymentMethod: {
+        select: {
+          EnName: true,
+          IsActive: true,
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    throw new Error("سفارش پیدا نشد یا متعلق به این مشتری نیست.");
+  }
+
+  if (
+    order.Fix_OrderPaymentConfirmationStatus_ID ===
+    PAYMENT_STATUS.PAID
+  ) {
+    throw new Error("این سفارش قبلاً پرداخت شده است.");
+  }
+
+  if (
+    order.Fix_OrderPaymentConfirmationStatus_ID ===
+    PAYMENT_STATUS.PAY_IN_PLACE
+  ) {
+    throw new Error("این سفارش برای پرداخت در محل ثبت شده است.");
+  }
+
+  if (
+    order.Fix_OrderPaymentMethod?.EnName !== "CardToCard" ||
+    !order.Fix_OrderPaymentMethod.IsActive
+  ) {
+    throw new Error("روش پرداخت این سفارش کارت به کارت نیست یا غیرفعال است.");
+  }
+
+  const bankAccount = await prisma.bankAccount.findFirst({
+    where: {
+      RowID: data.bankAccountId,
+      IsActive: true,
+      OnlineShop_IsShow: true,
+    },
+    select: {
+      RowID: true,
+    },
+  });
+
+  if (!bankAccount) {
+    throw new Error("حساب بانکی مقصد معتبر یا فعال نیست.");
+  }
+
+  await prisma.orderH.update({
+    where: {
+      RowID: order.RowID,
+    },
+    data: {
+      DepositBankAccount_ID: bankAccount.RowID,
+      DepositAmount: data.amount,
+      DepositTrackingNumber: trackingNumber,
+      DepositYear: year,
+      DepositMonth: month,
+      DepositDay: day,
+      DepositHour: hour,
+      DepositMinute: minute,
+      DepositLastFourDigitsOfCreditCard: lastFourDigits,
+
+      Fix_OrderPaymentConfirmationStatus_ID:
+        PAYMENT_STATUS.PENDING,
+    },
+  });
+
+  return {
+    orderId: order.RowID.toString(),
+    paymentStatusId: PAYMENT_STATUS.PENDING,
+    message: "اطلاعات رسید پرداخت با موفقیت ثبت شد و در انتظار بررسی مدیر است.",
+  };
 }

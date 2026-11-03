@@ -4,10 +4,11 @@ import {
   getPaymentMethods,
   getPaymentStatus,
   getPaymentStatuses,
-  getPublicBankAccounts
+  getPublicBankAccounts,
+  startPayment,
+  submitCardToCardReceipt,
+  type CardToCardReceiptInput,
 } from "./payment.service.js";
-import { startPayment } from "./payment.service.js";
-
 export async function paymentMethods(c: Context) {
   try {
     const methods = await getPaymentMethods();
@@ -224,6 +225,137 @@ export async function publicBankAccounts(c: Context) {
         message: "خطا در دریافت اطلاعات حساب‌های بانکی.",
       },
       500,
+    );
+  }
+}
+
+export async function submitOrderPaymentReceipt(c: Context) {
+  try {
+    const customer = c.get("customer");
+
+    if (!customer) {
+      return c.json(
+        {
+          success: false,
+          message: "احراز هویت مشتری انجام نشده است.",
+        },
+        401,
+      );
+    }
+
+    const orderIdRaw = c.req.param("orderId");
+
+    if (!orderIdRaw || !/^\d+$/.test(orderIdRaw)) {
+      return c.json(
+        {
+          success: false,
+          message: "شناسه سفارش نامعتبر است.",
+        },
+        400,
+      );
+    }
+
+    const orderId = BigInt(orderIdRaw);
+
+    if (orderId <= 0n) {
+      return c.json(
+        {
+          success: false,
+          message: "شناسه سفارش نامعتبر است.",
+        },
+        400,
+      );
+    }
+
+    let body: unknown;
+
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json(
+        {
+          success: false,
+          message: "بدنه درخواست JSON معتبر نیست.",
+        },
+        400,
+      );
+    }
+
+    if (
+      typeof body !== "object" ||
+      body === null ||
+      Array.isArray(body)
+    ) {
+      return c.json(
+        {
+          success: false,
+          message: "اطلاعات رسید معتبر نیست.",
+        },
+        400,
+      );
+    }
+
+    const input = body as Record<string, unknown>;
+
+    if (
+      typeof input.bankAccountId !== "number" ||
+      !Number.isInteger(input.bankAccountId) ||
+      typeof input.amount !== "number" ||
+      typeof input.trackingNumber !== "string" ||
+      typeof input.year !== "string" ||
+      typeof input.month !== "string" ||
+      typeof input.day !== "string" ||
+      typeof input.hour !== "string" ||
+      typeof input.minute !== "string" ||
+      typeof input.lastFourDigits !== "string"
+    ) {
+      return c.json(
+        {
+          success: false,
+          message: "اطلاعات ارسالی رسید ناقص یا نامعتبر است.",
+        },
+        400,
+      );
+    }
+
+    const receiptData: CardToCardReceiptInput = {
+      bankAccountId: input.bankAccountId,
+      amount: input.amount,
+      trackingNumber: input.trackingNumber,
+      year: input.year,
+      month: input.month,
+      day: input.day,
+      hour: input.hour,
+      minute: input.minute,
+      lastFourDigits: input.lastFourDigits,
+    };
+
+    const result = await submitCardToCardReceipt(
+      customer.RowID,
+      orderId,
+      receiptData,
+    );
+
+    return c.json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "POST /payment/order/:orderId/receipt error:",
+      error,
+    );
+
+    return c.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "ثبت رسید پرداخت با خطا مواجه شد.",
+      },
+      400,
     );
   }
 }

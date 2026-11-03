@@ -1,12 +1,12 @@
 import { Hono } from "hono";
-
 import {
   paymentMethodDetail,
   paymentMethods,
   paymentStatusDetail,
   paymentStatuses,
   publicBankAccounts,
-  startOrderPayment
+  startOrderPayment,
+  submitOrderPaymentReceipt,
 } from "./payment.controller.js";
 import { requireCustomerAuth } from "../../middleware/auth.middleware.js";
 
@@ -42,6 +42,12 @@ paymentRoutes.post(
 paymentRoutes.get(
   "/bank-accounts",
   publicBankAccounts,
+);
+
+paymentRoutes.post(
+  "/order/:orderId/receipt",
+  requireCustomerAuth,
+  submitOrderPaymentReceipt,
 );
 
 export default paymentRoutes;

@@ -137,8 +137,23 @@ export async function saveSiteBranchConfig(input: {
   `);
   if (!valid.length) throw new Error("شعبه، شهر یا انبار انتخاب‌شده معتبر نیست.");
 
+  if (input.salePriceTypeId !== null) {
+    const validPriceType = await prisma.$queryRaw<Array<{ RowID: bigint }>>(Prisma.sql`
+      SELECT RowID
+      FROM dbo.SalePriceType
+      WHERE RowID = ${input.salePriceTypeId}
+        AND IsActive = 1
+        AND (BranchID IS NULL OR BranchID = ${input.branchId})
+    `);
+    if (!validPriceType.length) {
+      throw new Error("نوع قیمت انتخاب‌شده فعال نیست یا به شعبه دیگری تعلق دارد.");
+    }
+  }
+
+  const isDefault = input.isActive && input.isDefault;
+
   await prisma.$transaction(async (tx) => {
-    if (input.isDefault) {
+    if (isDefault) {
       await tx.$executeRaw(Prisma.sql`
         UPDATE dbo.SiteBranchConfig SET IsDefault = 0 WHERE City_ID = ${input.cityId}
       `);
@@ -148,14 +163,14 @@ export async function saveSiteBranchConfig(input: {
         UPDATE dbo.SiteBranchConfig
         SET City_ID = ${input.cityId}, Warehouse_ID = ${input.warehouseId},
             SalePriceType_ID = ${input.salePriceTypeId}, Latitude = ${input.latitude},
-            Longitude = ${input.longitude}, IsActive = ${input.isActive}, IsDefault = ${input.isDefault}
+            Longitude = ${input.longitude}, IsActive = ${input.isActive}, IsDefault = ${isDefault}
         WHERE Branch_ID = ${input.branchId}
       ELSE
         INSERT INTO dbo.SiteBranchConfig
           (Branch_ID, City_ID, Warehouse_ID, SalePriceType_ID, Latitude, Longitude, IsActive, IsDefault)
         VALUES
           (${input.branchId}, ${input.cityId}, ${input.warehouseId}, ${input.salePriceTypeId},
-           ${input.latitude}, ${input.longitude}, ${input.isActive}, ${input.isDefault})
+           ${input.latitude}, ${input.longitude}, ${input.isActive}, ${isDefault})
     `);
   });
 }

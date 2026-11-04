@@ -9,7 +9,7 @@ BEGIN
     Branch_ID INT NOT NULL,
     City_ID BIGINT NOT NULL,
     Warehouse_ID SMALLINT NOT NULL,
-    SalePriceType_ID INT NULL,
+    SalePriceType_ID BIGINT NULL,
     Latitude DECIMAL(10, 7) NULL,
     Longitude DECIMAL(10, 7) NULL,
     IsActive BIT NOT NULL CONSTRAINT DF_SiteBranchConfig_IsActive DEFAULT (1),

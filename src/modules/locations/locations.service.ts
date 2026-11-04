@@ -181,16 +181,6 @@ export async function createAddressForPerson(personId: number, input: {
   if (input.longitude != null && (!Number.isFinite(input.longitude) || input.longitude < -180 || input.longitude > 180)) {
     throw new Error("طول جغرافیایی معتبر نیست.");
   }
-  if ((input.latitude == null) !== (input.longitude == null)) {
-    throw new Error("هر دو مختصات جغرافیایی باید وارد شوند.");
-  }
-  if (input.latitude != null && (input.latitude < -90 || input.latitude > 90)) {
-    throw new Error("عرض جغرافیایی معتبر نیست.");
-  }
-  if (input.longitude != null && (input.longitude < -180 || input.longitude > 180)) {
-    throw new Error("طول جغرافیایی معتبر نیست.");
-  }
-
   return prisma.$transaction(async (tx) => {
     const address = await tx.orderDeliveryAddress.create({
       data: {

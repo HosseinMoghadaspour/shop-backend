@@ -232,7 +232,7 @@ async function buildCartResponse(
 
   let salePriceTypeId: number | undefined;
   if (branchId !== undefined) {
-    const configs = await prisma.$queryRaw<Array<{ SalePriceType_ID: number | null }>>(Prisma.sql`SELECT SalePriceType_ID FROM dbo.SiteBranchConfig WHERE Branch_ID = ${branchId} AND IsActive = 1`);
+    const configs = await prisma.$queryRaw<Array<{ SalePriceType_ID: number | null }>>(Prisma.sql`SELECT config.SalePriceType_ID FROM dbo.SiteBranchConfig config INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID AND branch.IsActive = 1 INNER JOIN dbo.Warehouse warehouse ON warehouse.RowID = config.Warehouse_ID AND warehouse.Branch_ID = config.Branch_ID AND warehouse.IsActive = 1 WHERE config.Branch_ID = ${branchId} AND config.IsActive = 1`);
     if (!configs.length) throw new Error("شعبه انتخاب‌شده در فروشگاه فعال نیست.");
     salePriceTypeId = configs[0].SalePriceType_ID == null ? undefined : Number(configs[0].SalePriceType_ID);
   }

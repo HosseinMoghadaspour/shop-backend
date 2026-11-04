@@ -1,5 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
+import { resolveProductPricing } from "../pricing/price.service.js";
+import { Prisma } from "../../generated/prisma/client.js";
 import type {
   CartItem,
   CartItemResponse,
@@ -184,6 +186,7 @@ function validateQuantity(
 
 async function buildCartResponse(
   cart: RedisCart,
+  branchId?: number,
 ): Promise<CartResponse> {
   if (cart.items.length === 0) {
     return {
@@ -241,6 +244,13 @@ async function buildCartResponse(
     goods.map((good) => [good.RowID, good]),
   );
 
+  let salePriceTypeId: number | undefined;
+  if (branchId !== undefined) {
+    const configs = await prisma.$queryRaw<Array<{ SalePriceType_ID: number | null }>>(Prisma.sql`SELECT SalePriceType_ID FROM dbo.SiteBranchConfig WHERE Branch_ID = ${branchId} AND IsActive = 1`);
+    if (!configs.length) throw new Error("شعبه انتخاب‌شده در فروشگاه فعال نیست.");
+    salePriceTypeId = configs[0].SalePriceType_ID ?? undefined;
+  }
+
   const responseItems: CartItemResponse[] = [];
 
   for (const item of cart.items) {
@@ -258,7 +268,8 @@ async function buildCartResponse(
       continue;
     }
 
-    const unitPrice = getGoodPrice(good);
+    const pricing = await resolveProductPricing(good, { branchId, salePriceTypeId });
+    const unitPrice = pricing.finalPrice;
 
     responseItems.push({
       goodId: good.RowID,
@@ -334,16 +345,17 @@ async function buildCartResponse(
   };
 }
 
-export async function getCart(personId: number) {
+export async function getCart(personId: number, branchId?: number) {
   const cart = await getRawCart(personId);
 
-  return buildCartResponse(cart);
+  return buildCartResponse(cart, branchId);
 }
 
 export async function addToCart(
   personId: number,
   goodId: number,
   quantity: number,
+  branchId?: number,
 ) {
   if (!Number.isInteger(goodId) || goodId <= 0) {
     throw new Error("شناسه محصول نامعتبر است.");
@@ -380,13 +392,14 @@ export async function addToCart(
 
   await saveCart(cart);
 
-  return buildCartResponse(cart);
+  return buildCartResponse(cart, branchId);
 }
 
 export async function updateCartItem(
   personId: number,
   goodId: number,
   quantity: number,
+  branchId?: number,
 ) {
   const good = await getGood(goodId);
 
@@ -414,12 +427,13 @@ export async function updateCartItem(
 
   await saveCart(cart);
 
-  return buildCartResponse(cart);
+  return buildCartResponse(cart, branchId);
 }
 
 export async function removeFromCart(
   personId: number,
   goodId: number,
+  branchId?: number,
 ) {
   const cart = await getRawCart(personId);
 
@@ -429,7 +443,7 @@ export async function removeFromCart(
 
   await saveCart(cart);
 
-  return buildCartResponse(cart);
+  return buildCartResponse(cart, branchId);
 }
 
 export async function clearCart(personId: number) {

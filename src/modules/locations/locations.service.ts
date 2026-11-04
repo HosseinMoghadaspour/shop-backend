@@ -1,5 +1,4 @@
 import { prisma } from "../../lib/prisma.js";
-import { Prisma } from "../../generated/prisma/client.js";
 
 export async function getProvinces() {
   const provinces = await prisma.province.findMany({

@@ -140,3 +140,41 @@ export async function getAddressByPersonId(personId: number) {
             : null,
     }));
 }
+
+
+export async function createAddressForPerson(personId: number, input: {
+  cityId: number;
+  deliverToName: string;
+  deliverToMobileNumber: string;
+  deliverToPhoneNumber?: string;
+  Adrs: string;
+  PostalCode?: string;
+  RowDesc?: string;
+}) {
+  const city = await prisma.city.findFirst({
+    where: { RowID: input.cityId, IsActive: true },
+    select: { RowID: true, County: { select: { Province_ID: true } } },
+  });
+  if (!city?.County?.Province_ID) {
+    throw new Error("شهر انتخاب‌شده معتبر نیست.");
+  }
+  if (!input.deliverToName.trim() || !input.deliverToMobileNumber.trim() || !input.Adrs.trim()) {
+    throw new Error("نام تحویل‌گیرنده، موبایل و آدرس الزامی است.");
+  }
+  return prisma.orderDeliveryAddress.create({
+    data: {
+      Person: { connect: { RowID: personId } },
+      Province: { connect: { RowID: city.County.Province_ID } },
+      City: { connect: { RowID: city.RowID } },
+      DeliverToName: input.deliverToName.trim(),
+      DeliverToMobileNumber: input.deliverToMobileNumber.trim(),
+      DeliverToPhoneNumber: input.deliverToPhoneNumber?.trim() || null,
+      Adrs: input.Adrs.trim(),
+      PostalCode: input.PostalCode?.trim() || null,
+      RowDesc: input.RowDesc?.trim() || null,
+      FDateInsert: new Intl.DateTimeFormat("fa-IR-u-nu-latn", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replaceAll("-", "/"),
+      FTimeInsert: new Date().toTimeString().slice(0, 5),
+    },
+    select: { RowID: true },
+  });
+}

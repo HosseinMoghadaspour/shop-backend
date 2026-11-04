@@ -812,7 +812,7 @@ async function createOrderInternal(
 
     const pricing = await resolveProductPricing(good, {
       branchId: data.branchId,
-      salePriceTypeId: branchConfig.SalePriceType_ID ?? undefined,
+      salePriceTypeId: branchConfig.SalePriceType_ID == null ? undefined : Number(branchConfig.SalePriceType_ID),
     });
     const unitPrice = pricing.finalPrice;
 

@@ -98,9 +98,6 @@ export async function getAddressByPersonId(personId: number) {
         },
     });
 
-    const geoRows = addresses.length ? await prisma.$queryRaw<Array<{ Address_ID: bigint; Latitude: number; Longitude: number }>>(Prisma.sql`SELECT Address_ID, Latitude, Longitude FROM dbo.SiteAddressGeo WHERE Address_ID IN (${Prisma.join(addresses.map((address) => address.RowID))})`) : [];
-    const geoByAddress = new Map(geoRows.map((row) => [Number(row.Address_ID), row]));
-
     return addresses.map((address) => ({
         id: Number(address.RowID),
 
@@ -115,8 +112,8 @@ export async function getAddressByPersonId(personId: number) {
         address: address.Adrs,
 
         postalCode: address.PostalCode,
-        latitude: geoByAddress.get(Number(address.RowID))?.Latitude == null ? null : Number(geoByAddress.get(Number(address.RowID))!.Latitude),
-        longitude: geoByAddress.get(Number(address.RowID))?.Longitude == null ? null : Number(geoByAddress.get(Number(address.RowID))!.Longitude),
+        latitude: address.Latitude == null ? null : Number(address.Latitude),
+        longitude: address.Longitude == null ? null : Number(address.Longitude),
 
         isActive: address.IsActive,
 
@@ -193,14 +190,13 @@ export async function createAddressForPerson(personId: number, input: {
         Adrs: input.Adrs.trim(),
         PostalCode: input.PostalCode?.trim() || null,
         RowDesc: input.RowDesc?.trim() || null,
+        Latitude: input.latitude ?? null,
+        Longitude: input.longitude ?? null,
         FDateInsert: new Intl.DateTimeFormat("fa-IR-u-nu-latn", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replaceAll("-", "/"),
         FTimeInsert: new Date().toTimeString().slice(0, 5),
       },
       select: { RowID: true },
     });
-    if (input.latitude != null && input.longitude != null) {
-      await tx.$executeRaw(Prisma.sql`INSERT INTO dbo.SiteAddressGeo (Address_ID, Latitude, Longitude) VALUES (${address.RowID}, ${input.latitude}, ${input.longitude})`);
-    }
     return address;
   });
 }

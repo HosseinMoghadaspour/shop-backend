@@ -164,7 +164,7 @@ export async function saveSiteBranchConfig(input: {
         UPDATE dbo.SiteBranchConfig
         SET City_ID = ${input.cityId}, Warehouse_ID = ${input.warehouseId},
             SalePriceType_ID = ${input.salePriceTypeId}, Latitude = ${input.latitude},
-            Longitude = ${input.longitude}, IsActive = ${input.isActive}, IsDefault = ${isDefault}
+            Longitude = ${input.longitude}, IsActive = ${input.isActive}, IsDefault = ${isDefault}, UpdatedAt = SYSUTCDATETIME()
         WHERE Branch_ID = ${input.branchId}
       ELSE
         INSERT INTO dbo.SiteBranchConfig

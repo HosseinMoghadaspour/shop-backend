@@ -4,7 +4,7 @@ BEGIN
     Branch_ID INT NOT NULL,
     City_ID BIGINT NOT NULL,
     Warehouse_ID SMALLINT NOT NULL,
-    SalePriceType_ID INT NULL,
+    SalePriceType_ID BIGINT NULL,
     Latitude DECIMAL(10, 7) NULL,
     Longitude DECIMAL(10, 7) NULL,
     IsActive BIT NOT NULL CONSTRAINT DF_SiteBranchConfig_IsActive DEFAULT (1),
@@ -14,7 +14,9 @@ BEGIN
     CONSTRAINT PK_SiteBranchConfig PRIMARY KEY (Branch_ID),
     CONSTRAINT FK_SiteBranchConfig_Branch FOREIGN KEY (Branch_ID) REFERENCES dbo.Branch(RowID),
     CONSTRAINT FK_SiteBranchConfig_City FOREIGN KEY (City_ID) REFERENCES dbo.City(RowID),
-    CONSTRAINT FK_SiteBranchConfig_Warehouse FOREIGN KEY (Warehouse_ID) REFERENCES dbo.Warehouse(RowID)
+    CONSTRAINT FK_SiteBranchConfig_Warehouse FOREIGN KEY (Warehouse_ID) REFERENCES dbo.Warehouse(RowID),
+    CONSTRAINT FK_SiteBranchConfig_SalePriceType FOREIGN KEY (SalePriceType_ID) REFERENCES dbo.SalePriceType(RowID)
   );
   CREATE INDEX IX_SiteBranchConfig_City_Active ON dbo.SiteBranchConfig(City_ID, IsActive, IsDefault);
+  CREATE UNIQUE INDEX UX_SiteBranchConfig_City_Default ON dbo.SiteBranchConfig(City_ID) WHERE IsDefault = 1 AND IsActive = 1;
 END;

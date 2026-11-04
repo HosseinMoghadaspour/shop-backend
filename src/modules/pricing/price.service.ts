@@ -87,7 +87,10 @@ export async function resolveProductPricing(
   options: { branchId?: number; salePriceTypeId?: number } = {},
 ): Promise<ProductPricing> {
   const branchId = options.branchId ?? (await findMainBranch())?.id;
-  const salePriceTypeId = options.salePriceTypeId ?? (branchId == null ? undefined : (await findBranchSalePriceType(branchId)) ?? undefined);
+  const configuredPriceTypeId = branchId == null ? null : await findBranchSalePriceType(branchId);
+  const salePriceTypeId = options.branchId !== undefined
+    ? configuredPriceTypeId ?? undefined
+    : options.salePriceTypeId ?? configuredPriceTypeId ?? undefined;
   const [branch, saleType] = await Promise.all([
     branchId == null ? Promise.resolve(null) : findBranchPrice(product.RowID, branchId),
     salePriceTypeId == null

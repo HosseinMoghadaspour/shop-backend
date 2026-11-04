@@ -1,6 +1,7 @@
 import {
   findBranchPrice,
   findBranchPrices,
+  findBranchSalePriceType,
   findMainBranch,
   findSalePrice,
   findSalePrices,
@@ -86,11 +87,12 @@ export async function resolveProductPricing(
   options: { branchId?: number; salePriceTypeId?: number } = {},
 ): Promise<ProductPricing> {
   const branchId = options.branchId ?? (await findMainBranch())?.id;
+  const salePriceTypeId = options.salePriceTypeId ?? (branchId == null ? undefined : (await findBranchSalePriceType(branchId)) ?? undefined);
   const [branch, saleType] = await Promise.all([
     branchId == null ? Promise.resolve(null) : findBranchPrice(product.RowID, branchId),
-    options.salePriceTypeId == null
+    salePriceTypeId == null
       ? Promise.resolve(null)
-      : findSalePrice(product.RowID, options.salePriceTypeId),
+      : findSalePrice(product.RowID, salePriceTypeId),
   ]);
 
   return buildPricing(product, branch, saleType);
@@ -109,13 +111,14 @@ export async function resolveProductsPricing(
   if (products.length === 0) return result;
 
   const branchId = options.branchId ?? (await findMainBranch())?.id;
+  const salePriceTypeId = options.salePriceTypeId ?? (branchId == null ? undefined : (await findBranchSalePriceType(branchId)) ?? undefined);
   const [branches, saleTypes] = await Promise.all([
     branchId == null
       ? Promise.resolve<BranchPriceRecord[]>([])
       : findBranchPrices(products.map((p) => p.RowID), branchId),
-    options.salePriceTypeId == null
+    salePriceTypeId == null
       ? Promise.resolve<SalePriceRecord[]>([])
-      : findSalePrices(products.map((p) => p.RowID), options.salePriceTypeId),
+      : findSalePrices(products.map((p) => p.RowID), salePriceTypeId),
   ]);
 
   const branchMap = new Map(branches.map((item) => [item.goodId, item]));

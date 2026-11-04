@@ -246,8 +246,8 @@ async function findProductsStockInfo(productIds: number[], branchId?: number): P
   return stockInfoByProductId;
 }
 
-async function findProductStockInfo(productId: number): Promise<ProductStockInfo[]> {
-  const stockInfoByProductId = await findProductsStockInfo([productId]);
+async function findProductStockInfo(productId: number, branchId?: number): Promise<ProductStockInfo[]> {
+  const stockInfoByProductId = await findProductsStockInfo([productId], branchId);
   return stockInfoByProductId.get(productId) ?? [];
 }
 
@@ -409,7 +409,7 @@ export async function getNewProducts(limit = 12, options: Pick<ProductFilters, "
   return Promise.all(products.map(async (product) => {
     const [images, stockInfo] = await Promise.all([
       findProductImages(product.RowID),
-      findProductStockInfo(product.RowID),
+      findProductStockInfo(product.RowID, options.branchId),
     ]);
     return { ...mapProduct(product), pricing: pricing.get(product.RowID)!, images, stockInfo };
   }));

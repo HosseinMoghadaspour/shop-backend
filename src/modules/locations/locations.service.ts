@@ -124,8 +124,6 @@ export async function getAddressByPersonId(personId: number) {
             ? Number(address.City_ID)
             : null,
 
-        latitude: address.Latitude == null ? null : Number(address.Latitude),
-        longitude: address.Longitude == null ? null : Number(address.Longitude),
 
         city: address.City
             ? {

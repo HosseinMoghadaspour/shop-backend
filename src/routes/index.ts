@@ -15,6 +15,7 @@ import { authRoutes } from "../modules/auth/auth.routes.js";
 import { cartRoutes } from "../modules/cart/cart.routes.js";
 import { ordersRoutes } from "../modules/orders/orders.routes.js";
 import { locationsRoutes } from "../modules/locations/locations.routes.js";
+import { branchRoutes } from "../modules/branches/branches.routes.js";
 import paymentRoutes from "../modules/payment/payment.routes.js";
 import { adminProductRoutes } from "../modules/products/admin/admin-product.routes.js";
 import { adminCategoryRoutes } from "../modules/category/admin-category.routes.js";
@@ -84,6 +85,7 @@ routes.route("/cart", cartRoutes);
 routes.route("/orders", ordersRoutes);
 routes.route("/order", ordersRoutes);
 routes.route("/locations", locationsRoutes);
+routes.route("/branches", branchRoutes);
 routes.route("/payment", paymentRoutes);
 routes.route("/admin/products", adminProductRoutes);
 routes.route("/admin/categories", adminCategoryRoutes)

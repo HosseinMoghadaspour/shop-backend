@@ -169,6 +169,7 @@ export async function getAdminBranchOptions() {
     warehouseName: string;
     cityId: number | null;
     cityName: string | null;
+    provinceId: number | null;
     salePriceTypeId: number | null;
     latitude: number | null;
     longitude: number | null;
@@ -182,6 +183,7 @@ export async function getAdminBranchOptions() {
       warehouse.RowName AS warehouseName,
       config.City_ID AS cityId,
       city.RowName AS cityName,
+      county.Province_ID AS provinceId,
       config.SalePriceType_ID AS salePriceTypeId,
       config.Latitude AS latitude,
       config.Longitude AS longitude,
@@ -192,6 +194,7 @@ export async function getAdminBranchOptions() {
       ON warehouse.Branch_ID = branch.RowID AND warehouse.IsActive = 1
     LEFT JOIN dbo.SiteBranchConfig config ON config.Branch_ID = branch.RowID
     LEFT JOIN dbo.City city ON city.RowID = config.City_ID
+    LEFT JOIN dbo.County county ON county.RowID = city.County_ID
     WHERE branch.IsActive = 1
     ORDER BY branch.RowName, warehouse.RowName
   `);

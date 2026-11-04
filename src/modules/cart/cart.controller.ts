@@ -20,6 +20,13 @@ function getCustomerId(c: Context) {
   return customer.RowID;
 }
 
+function getBranchId(c: Context) {
+  const value = c.req.query("branchId");
+  if (value === undefined) return undefined;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
 function parsePositiveNumber(value: unknown) {
   const number = Number(value);
 
@@ -33,7 +40,9 @@ function parsePositiveNumber(value: unknown) {
 export async function getMyCart(c: Context) {
   const personId = getCustomerId(c);
 
-  const cart = await getCart(personId);
+  const branchId = getBranchId(c);
+  if (branchId === null) return c.json({ success: false, message: "شناسه شعبه نامعتبر است." }, 400);
+  const cart = await getCart(personId, branchId);
 
   return c.json({
     success: true,
@@ -43,6 +52,8 @@ export async function getMyCart(c: Context) {
 
 export async function addItem(c: Context) {
   const personId = getCustomerId(c);
+  const branchId = getBranchId(c);
+  if (branchId === null) return c.json({ success: false, message: "شناسه شعبه نامعتبر است." }, 400);
 
   const body = await c.req
     .json<{
@@ -85,6 +96,7 @@ export async function addItem(c: Context) {
       personId,
       goodId,
       quantity,
+      branchId,
     );
 
     return c.json({
@@ -108,6 +120,8 @@ export async function addItem(c: Context) {
 
 export async function updateItem(c: Context) {
   const personId = getCustomerId(c);
+  const branchId = getBranchId(c);
+  if (branchId === null) return c.json({ success: false, message: "شناسه شعبه نامعتبر است." }, 400);
 
   const goodId = Number(
     c.req.param("goodId"),
@@ -150,6 +164,7 @@ export async function updateItem(c: Context) {
       personId,
       goodId,
       quantity,
+      branchId,
     );
 
     return c.json({
@@ -173,6 +188,8 @@ export async function updateItem(c: Context) {
 
 export async function removeItem(c: Context) {
   const personId = getCustomerId(c);
+  const branchId = getBranchId(c);
+  if (branchId === null) return c.json({ success: false, message: "شناسه شعبه نامعتبر است." }, 400);
 
   const goodId = Number(
     c.req.param("goodId"),
@@ -191,6 +208,7 @@ export async function removeItem(c: Context) {
   const cart = await removeFromCart(
     personId,
     goodId,
+    branchId,
   );
 
   return c.json({

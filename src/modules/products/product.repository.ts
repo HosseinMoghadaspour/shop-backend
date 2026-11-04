@@ -180,9 +180,14 @@ async function findProductsStockInfo(productIds: number[], branchId?: number): P
 
   if (branchId !== undefined) {
     const config = await prisma.$queryRaw<Array<{ Warehouse_ID: number }>>(Prisma.sql`
-      SELECT Warehouse_ID
-      FROM dbo.SiteBranchConfig
-      WHERE Branch_ID = ${branchId} AND IsActive = 1
+      SELECT config.Warehouse_ID
+      FROM dbo.SiteBranchConfig config
+      INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID AND branch.IsActive = 1
+      INNER JOIN dbo.Warehouse warehouse
+        ON warehouse.RowID = config.Warehouse_ID
+        AND warehouse.Branch_ID = config.Branch_ID
+        AND warehouse.IsActive = 1
+      WHERE config.Branch_ID = ${branchId} AND config.IsActive = 1
     `);
     warehouseId = config[0]?.Warehouse_ID ?? null;
   } else {

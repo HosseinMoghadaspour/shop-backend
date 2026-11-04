@@ -183,6 +183,7 @@ export async function getAdminBranchOptions() {
     branchName: string;
     warehouseId: number;
     warehouseName: string;
+    configuredWarehouseId: number | null;
     cityId: bigint | null;
     cityName: string | null;
     provinceId: bigint | null;
@@ -197,6 +198,7 @@ export async function getAdminBranchOptions() {
       branch.RowName AS branchName,
       warehouse.RowID AS warehouseId,
       warehouse.RowName AS warehouseName,
+      config.Warehouse_ID AS configuredWarehouseId,
       config.City_ID AS cityId,
       city.RowName AS cityName,
       county.Province_ID AS provinceId,
@@ -218,6 +220,7 @@ export async function getAdminBranchOptions() {
     ...row,
     branchId: Number(row.branchId),
     warehouseId: Number(row.warehouseId),
+    configuredWarehouseId: row.configuredWarehouseId == null ? null : Number(row.configuredWarehouseId),
     cityId: row.cityId == null ? null : Number(row.cityId),
     provinceId: row.provinceId == null ? null : Number(row.provinceId),
     salePriceTypeId: row.salePriceTypeId == null ? null : Number(row.salePriceTypeId),

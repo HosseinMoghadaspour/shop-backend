@@ -72,6 +72,8 @@ export async function getAddressByPersonId(personId: number) {
             PostalCode: true,
             IsActive: true,
             City_ID: true,
+            Latitude: true,
+            Longitude: true,
 
             City: {
                 select: {
@@ -122,6 +124,9 @@ export async function getAddressByPersonId(personId: number) {
             ? Number(address.City_ID)
             : null,
 
+        latitude: address.Latitude == null ? null : Number(address.Latitude),
+        longitude: address.Longitude == null ? null : Number(address.Longitude),
+
         city: address.City
             ? {
                   id: Number(address.City.RowID),
@@ -168,6 +173,15 @@ export async function createAddressForPerson(personId: number, input: {
   }
   if (!input.deliverToName.trim() || !input.deliverToMobileNumber.trim() || !input.Adrs.trim()) {
     throw new Error("نام تحویل‌گیرنده، موبایل و آدرس الزامی است.");
+  }
+  if ((input.latitude == null) !== (input.longitude == null)) {
+    throw new Error("طول و عرض جغرافیایی باید هر دو ثبت شوند.");
+  }
+  if (input.latitude != null && (!Number.isFinite(input.latitude) || input.latitude < -90 || input.latitude > 90)) {
+    throw new Error("عرض جغرافیایی معتبر نیست.");
+  }
+  if (input.longitude != null && (!Number.isFinite(input.longitude) || input.longitude < -180 || input.longitude > 180)) {
+    throw new Error("طول جغرافیایی معتبر نیست.");
   }
   if ((input.latitude == null) !== (input.longitude == null)) {
     throw new Error("هر دو مختصات جغرافیایی باید وارد شوند.");

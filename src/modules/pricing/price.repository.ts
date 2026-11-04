@@ -199,3 +199,18 @@ export async function findSalePrices(
     branchId: row.BranchID == null ? null : Number(row.BranchID),
   }));
 }
+
+
+export async function findBranchSalePriceType(branchId: number): Promise<number | null> {
+  const db = await getDb();
+  const result = await db
+    .request()
+    .input("branchId", branchId)
+    .query(`
+      SELECT SalePriceType_ID
+      FROM dbo.SiteBranchConfig
+      WHERE Branch_ID = @branchId AND IsActive = 1;
+    `);
+  const value = result.recordset[0]?.SalePriceType_ID;
+  return value == null ? null : Number(value);
+}

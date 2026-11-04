@@ -234,7 +234,7 @@ async function buildCartResponse(
   if (branchId !== undefined) {
     const configs = await prisma.$queryRaw<Array<{ SalePriceType_ID: number | null }>>(Prisma.sql`SELECT SalePriceType_ID FROM dbo.SiteBranchConfig WHERE Branch_ID = ${branchId} AND IsActive = 1`);
     if (!configs.length) throw new Error("شعبه انتخاب‌شده در فروشگاه فعال نیست.");
-    salePriceTypeId = configs[0].SalePriceType_ID ?? undefined;
+    salePriceTypeId = configs[0].SalePriceType_ID == null ? undefined : Number(configs[0].SalePriceType_ID);
   }
 
   const responseItems: CartItemResponse[] = [];

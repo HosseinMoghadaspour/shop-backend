@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
+import { resolveProductPricing } from "../pricing/price.service.js";
 
 import type {
   CartItem,
@@ -628,6 +629,10 @@ async function createOrderInternal(
   }
 
 
+  if (!Number.isSafeInteger(data.branchId) || data.branchId <= 0) {
+    throw new Error("لطفاً شعبه موردنظر را انتخاب کنید.");
+  }
+
   if (!data.deliveryAddress) {
     throw new Error(
       "اطلاعات آدرس تحویل وارد نشده است.",
@@ -647,6 +652,36 @@ async function createOrderInternal(
     throw new Error("روش پرداخت انتخاب‌شده معتبر یا فعال نیست.");
   }
 
+  const deliveryCityId = "addressId" in data.deliveryAddress
+    ? (await prisma.orderDeliveryAddress.findFirst({
+        where: {
+          RowID: BigInt(data.deliveryAddress.addressId),
+          Person_ID: customer.RowID,
+          IsActive: true,
+        },
+        select: { City_ID: true },
+      }))?.City_ID
+    : data.deliveryAddress.cityId;
+
+  if (deliveryCityId == null) {
+    throw new Error("آدرس انتخاب‌شده معتبر نیست یا شهر آن مشخص نشده است.");
+  }
+
+  const branchConfigs = await prisma.$queryRaw<Array<{
+    Branch_ID: number;
+    City_ID: number;
+    Warehouse_ID: number;
+    SalePriceType_ID: number | null;
+  }>>(Prisma.sql`
+    SELECT Branch_ID, City_ID, Warehouse_ID, SalePriceType_ID
+    FROM dbo.SiteBranchConfig
+    WHERE Branch_ID = ${data.branchId} AND IsActive = 1
+  `);
+
+  const branchConfig = branchConfigs[0];
+  if (!branchConfig || Number(branchConfig.City_ID) !== Number(deliveryCityId)) {
+    throw new Error("شعبه انتخاب‌شده برای شهر آدرس تحویل فعال نیست.");
+  }
 
   const cart =
     await getCart(personId);
@@ -794,8 +829,11 @@ async function createOrderInternal(
 );
 
 
-    const unitPrice =
-      getProductPrice(good);
+    const pricing = await resolveProductPricing(good, {
+      branchId: data.branchId,
+      salePriceTypeId: branchConfig.SalePriceType_ID ?? undefined,
+    });
+    const unitPrice = pricing.finalPrice;
 
     if (
       !Number.isFinite(unitPrice) ||
@@ -850,10 +888,7 @@ async function createOrderInternal(
       mainMeasureUnitId: good.Main_MeasureUnit_ID || 0,
       defaultMeasureUnitId: good.Default_MeasureUnit_ID || 0,
 
-      discountPrice:
-        Number(
-          good.DiscountPrice ?? 0,
-        ),
+      discountPrice: pricing.discountPrice ?? 0,
 
       totalPrice:
         itemTotalPrice,
@@ -869,23 +904,13 @@ async function createOrderInternal(
     discountPrice +
     taxPrice;
 
-  const appSetting =
-    await prisma.appSettings.findFirst({
-      select: {
-        Branch_ID: true,
-        FinancialYear_ID: true,
-        SiteWareHouseID: true,
-      },
-    });
+  const appSetting = await prisma.appSettings.findFirst({
+    select: { FinancialYear_ID: true },
+  });
 
-  const branchId =
-    appSetting?.Branch_ID ?? 1;
-
-  const financialYearId =
-    appSetting?.FinancialYear_ID ?? 2;
-
-  const warehouseId =
-    appSetting?.SiteWareHouseID;
+  const branchId = data.branchId;
+  const financialYearId = appSetting?.FinancialYear_ID ?? 2;
+  const warehouseId = Number(branchConfig.Warehouse_ID);
 
 if (!warehouseId) {
   throw new Error(

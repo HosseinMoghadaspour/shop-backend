@@ -19,14 +19,29 @@ export interface SalePriceRecord {
 
 export async function findMainBranch(): Promise<{ id: number; name: string } | null> {
   const db = await getDb();
-  const result = await db.request().query(`
+  const configured = await db.request().query(`
+    SELECT TOP 1 branch.RowID, branch.RowName
+    FROM dbo.SiteBranchConfig config
+    INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID
+    WHERE config.IsActive = 1
+      AND config.IsDefault = 1
+      AND branch.IsActive = 1
+    ORDER BY branch.RowID;
+  `);
+
+  const configuredRow = configured.recordset[0];
+  if (configuredRow) {
+    return { id: Number(configuredRow.RowID), name: String(configuredRow.RowName) };
+  }
+
+  // Compatibility fallback until a default online-store branch is configured.
+  const fallback = await db.request().query(`
     SELECT TOP 1 RowID, RowName
     FROM dbo.Branch
     WHERE IsActive = 1 AND ISNULL(MainBranch, 0) = 1
     ORDER BY RowID;
   `);
-
-  const row = result.recordset[0];
+  const row = fallback.recordset[0];
   return row ? { id: Number(row.RowID), name: String(row.RowName) } : null;
 }
 

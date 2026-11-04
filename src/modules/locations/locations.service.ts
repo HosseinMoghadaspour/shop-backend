@@ -163,7 +163,7 @@ export async function createAddressForPerson(personId: number, input: {
   longitude?: number | null;
 }) {
   const city = await prisma.city.findFirst({
-    where: { RowID: input.cityId, IsActive: true },
+    where: { RowID: BigInt(input.cityId), IsActive: true },
     select: { RowID: true, County: { select: { Province_ID: true } } },
   });
   if (!city?.County?.Province_ID) {

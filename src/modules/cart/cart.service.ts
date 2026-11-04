@@ -80,6 +80,7 @@ async function getGood(goodId: number) {
 
       SalePrice: true,
       DiscountPrice: true,
+      ConsumerPrice: true,
 
       MinOrderSite: true,
       MaxOrderSite: true,
@@ -107,21 +108,6 @@ async function getGood(goodId: number) {
       },
     },
   });
-}
-
-function getGoodPrice(good: {
-  SalePrice: number;
-  DiscountPrice: number | null;
-}) {
-  if (
-    good.DiscountPrice !== null &&
-    good.DiscountPrice > 0 &&
-    good.DiscountPrice < good.SalePrice
-  ) {
-    return good.DiscountPrice;
-  }
-
-  return good.SalePrice;
 }
 
 function validateQuantity(

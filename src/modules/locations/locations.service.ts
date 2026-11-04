@@ -19,7 +19,7 @@ export async function getProvinces() {
 export async function getCitiesByProvince(provinceId: number) {
   const province = await prisma.province.findFirst({
     where: {
-      RowID: provinceId,
+      RowID: BigInt(provinceId),
       IsActive: true,
     },
     select: { RowID: true },

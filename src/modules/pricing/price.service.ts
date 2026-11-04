@@ -1,3 +1,5 @@
+import { Prisma } from "../../generated/prisma/client.js";
+import { prisma } from "../../lib/prisma.js";
 import {
   findBranchPrice,
   findBranchPrices,
@@ -9,6 +11,24 @@ import {
   type SalePriceRecord,
 } from "./price.repository.js";
 import type { ProductPricing } from "./price.types.js";
+
+async function resolvePricingOptions(options: { branchId?: number; salePriceTypeId?: number }) {
+  const resolvedOptions = await resolvePricingOptions(options);
+  const { branchId, salePriceTypeId } = resolvedOptions;
+  let salePriceTypeId = options.salePriceTypeId;
+
+  if (salePriceTypeId === undefined && branchId !== undefined) {
+    const configs = await prisma.$queryRaw<Array<{ SalePriceType_ID: bigint | null }>>(Prisma.sql`
+      SELECT SalePriceType_ID
+      FROM dbo.SiteBranchConfig
+      WHERE Branch_ID = ${branchId} AND IsActive = 1
+    `);
+    const configuredId = configs[0]?.SalePriceType_ID;
+    salePriceTypeId = configuredId == null ? undefined : Number(configuredId);
+  }
+
+  return { branchId, salePriceTypeId };
+}
 
 function normalizeDiscount(salePrice: number, discountPrice: number | null) {
   if (

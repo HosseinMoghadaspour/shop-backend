@@ -121,26 +121,6 @@ function getCurrentTime(): string {
     .slice(0, 5);
 }
 
-function getProductPrice(good: {
-  SalePrice: number;
-  DiscountPrice: number | null;
-}): number {
-  const salePrice =
-    Number(good.SalePrice ?? 0);
-
-  const discountPrice =
-    Number(good.DiscountPrice ?? 0);
-
-  if (
-    discountPrice > 0 &&
-    discountPrice < salePrice
-  ) {
-    return discountPrice;
-  }
-
-  return salePrice;
-}
-
 function validateQuantity(
   quantity: number,
   minOrder: number | null,

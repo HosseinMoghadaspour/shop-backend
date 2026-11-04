@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import { listAllSiteBranchConfigs, listSiteBranches, saveSiteBranchConfig } from "./branches.service.js";
+import { getAdminBranchOptions, listAllSiteBranchConfigs, listSiteBranches, saveSiteBranchConfig } from "./branches.service.js";
 
 export async function getBranches(c: Context) {
   const cityId = Number(c.req.query("cityId"));
@@ -49,4 +49,8 @@ export async function putAdminBranch(c: Context) {
   } catch (error) {
     return c.json({ success: false, message: error instanceof Error ? error.message : "ذخیره تنظیمات شعبه ناموفق بود." }, 400);
   }
+}
+
+export async function getAdminBranchSetupOptions(c: Context) {
+  return c.json({ success: true, data: await getAdminBranchOptions() });
 }

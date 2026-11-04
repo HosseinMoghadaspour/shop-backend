@@ -47,12 +47,11 @@ GET /products/:id
 GET /products/code/:code
 ```
 
-برای انتخاب قیمت شعبه یا Price Type می‌توان از این queryها استفاده کرد:
+برای دریافت قیمت شعبه، `branchId` را ارسال کنید تا نوع قیمت تنظیم‌شده برای همان شعبه اعمال شود. `salePriceTypeId` فقط وقتی استفاده می‌شود که `branchId` صریحاً ارسال نشده باشد:
 
 ```text
 ?branchId=1
 ?salePriceTypeId=2
-?branchId=1&salePriceTypeId=2
 ```
 
 ### Special lists

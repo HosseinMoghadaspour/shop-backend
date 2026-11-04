@@ -67,6 +67,7 @@ export async function listSiteBranches(cityId: number, latitude?: number, longit
     INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID
     INNER JOIN dbo.City city ON city.RowID = config.City_ID
     WHERE config.City_ID = ${cityId}
+      AND city.IsActive = 1
       AND config.IsActive = 1
       AND branch.IsActive = 1
       AND EXISTS (

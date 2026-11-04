@@ -261,7 +261,7 @@ export async function createOrderDelivery(
 
   const city = await tx.city.findFirst({
     where: {
-      RowID: data.cityId,
+      RowID: BigInt(data.cityId),
       IsActive: true,
     },
     select: {

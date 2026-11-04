@@ -45,6 +45,17 @@ export async function findMainBranch(): Promise<{ id: number; name: string } | n
   return row ? { id: Number(row.RowID), name: String(row.RowName) } : null;
 }
 
+export async function findBranchSalePriceType(branchId: number): Promise<number | null> {
+  const db = await getDb();
+  const result = await db.request().input("branchId", branchId).query(`
+    SELECT TOP 1 SalePriceType_ID
+    FROM dbo.SiteBranchConfig
+    WHERE Branch_ID = @branchId AND IsActive = 1;
+  `);
+  const value = result.recordset[0]?.SalePriceType_ID;
+  return value == null ? null : Number(value);
+}
+
 export async function findBranchPrice(
   goodId: number,
   branchId: number,

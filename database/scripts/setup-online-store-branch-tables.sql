@@ -20,8 +20,10 @@ BEGIN
     CONSTRAINT FK_SiteBranchConfig_Branch FOREIGN KEY (Branch_ID) REFERENCES dbo.Branch(RowID),
     CONSTRAINT FK_SiteBranchConfig_City FOREIGN KEY (City_ID) REFERENCES dbo.City(RowID),
     CONSTRAINT FK_SiteBranchConfig_Warehouse FOREIGN KEY (Warehouse_ID) REFERENCES dbo.Warehouse(RowID),
+    CONSTRAINT FK_SiteBranchConfig_SalePriceType FOREIGN KEY (SalePriceType_ID) REFERENCES dbo.SalePriceType(RowID),
     CONSTRAINT CK_SiteBranchConfig_Latitude CHECK (Latitude IS NULL OR Latitude BETWEEN -90 AND 90),
     CONSTRAINT CK_SiteBranchConfig_Longitude CHECK (Longitude IS NULL OR Longitude BETWEEN -180 AND 180),
+    CONSTRAINT CK_SiteBranchConfig_Coordinates CHECK ((Latitude IS NULL AND Longitude IS NULL) OR (Latitude IS NOT NULL AND Longitude IS NOT NULL)),
     CONSTRAINT CK_SiteBranchConfig_Coordinates CHECK (
       (Latitude IS NULL AND Longitude IS NULL) OR
       (Latitude IS NOT NULL AND Longitude IS NOT NULL)
@@ -40,4 +42,23 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.SiteB
   CREATE INDEX IX_SiteBranchConfig_CityActive
     ON dbo.SiteBranchConfig(City_ID, IsActive)
     INCLUDE (Branch_ID, Warehouse_ID, SalePriceType_ID, Latitude, Longitude, IsDefault);
+GO
+
+GO
+
+IF OBJECT_ID(N'dbo.SiteAddressGeo', N'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.SiteAddressGeo
+  (
+    Address_ID BIGINT NOT NULL,
+    Latitude DECIMAL(10, 7) NOT NULL,
+    Longitude DECIMAL(10, 7) NOT NULL,
+    UpdatedAt DATETIME2(0) NOT NULL CONSTRAINT DF_SiteAddressGeo_UpdatedAt DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT PK_SiteAddressGeo PRIMARY KEY (Address_ID),
+    CONSTRAINT FK_SiteAddressGeo_Address FOREIGN KEY (Address_ID)
+      REFERENCES dbo.OrderDeliveryAddress(RowID) ON DELETE CASCADE,
+    CONSTRAINT CK_SiteAddressGeo_Latitude CHECK (Latitude BETWEEN -90 AND 90),
+    CONSTRAINT CK_SiteAddressGeo_Longitude CHECK (Longitude BETWEEN -180 AND 180)
+  );
+END;
 GO

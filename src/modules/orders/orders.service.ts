@@ -743,6 +743,7 @@ async function createOrderInternal(
   RowName: true,
   SalePrice: true,
   DiscountPrice: true,
+  ConsumerPrice: true,
   MinOrderSite: true,
   MaxOrderSite: true,
 

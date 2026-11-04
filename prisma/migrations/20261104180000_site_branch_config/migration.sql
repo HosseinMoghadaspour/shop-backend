@@ -2,7 +2,7 @@ IF OBJECT_ID(N'dbo.SiteBranchConfig', N'U') IS NULL
 BEGIN
   CREATE TABLE dbo.SiteBranchConfig (
     Branch_ID INT NOT NULL,
-    City_ID INT NOT NULL,
+    City_ID BIGINT NOT NULL,
     Warehouse_ID SMALLINT NOT NULL,
     SalePriceType_ID INT NULL,
     Latitude DECIMAL(10, 7) NULL,

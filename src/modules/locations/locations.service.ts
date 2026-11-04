@@ -1,4 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
+import { Prisma } from "../../generated/prisma/client.js";
 
 export async function getProvinces() {
   const provinces = await prisma.province.findMany({
@@ -95,6 +96,9 @@ export async function getAddressByPersonId(personId: number) {
         },
     });
 
+    const geoRows = addresses.length ? await prisma.$queryRaw<Array<{ Address_ID: bigint; Latitude: number; Longitude: number }>>(Prisma.sql`SELECT Address_ID, Latitude, Longitude FROM dbo.SiteAddressGeo WHERE Address_ID IN (${Prisma.join(addresses.map((address) => address.RowID))})`) : [];
+    const geoByAddress = new Map(geoRows.map((row) => [Number(row.Address_ID), row]));
+
     return addresses.map((address) => ({
         id: Number(address.RowID),
 
@@ -109,6 +113,8 @@ export async function getAddressByPersonId(personId: number) {
         address: address.Adrs,
 
         postalCode: address.PostalCode,
+        latitude: geoByAddress.get(Number(address.RowID))?.Latitude == null ? null : Number(geoByAddress.get(Number(address.RowID))!.Latitude),
+        longitude: geoByAddress.get(Number(address.RowID))?.Longitude == null ? null : Number(geoByAddress.get(Number(address.RowID))!.Longitude),
 
         isActive: address.IsActive,
 
@@ -150,6 +156,8 @@ export async function createAddressForPerson(personId: number, input: {
   Adrs: string;
   PostalCode?: string;
   RowDesc?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }) {
   const city = await prisma.city.findFirst({
     where: { RowID: input.cityId, IsActive: true },
@@ -161,20 +169,36 @@ export async function createAddressForPerson(personId: number, input: {
   if (!input.deliverToName.trim() || !input.deliverToMobileNumber.trim() || !input.Adrs.trim()) {
     throw new Error("نام تحویل‌گیرنده، موبایل و آدرس الزامی است.");
   }
-  return prisma.orderDeliveryAddress.create({
-    data: {
-      Person: { connect: { RowID: personId } },
-      Province: { connect: { RowID: city.County.Province_ID } },
-      City: { connect: { RowID: city.RowID } },
-      DeliverToName: input.deliverToName.trim(),
-      DeliverToMobileNumber: input.deliverToMobileNumber.trim(),
-      DeliverToPhoneNumber: input.deliverToPhoneNumber?.trim() || null,
-      Adrs: input.Adrs.trim(),
-      PostalCode: input.PostalCode?.trim() || null,
-      RowDesc: input.RowDesc?.trim() || null,
-      FDateInsert: new Intl.DateTimeFormat("fa-IR-u-nu-latn", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replaceAll("-", "/"),
-      FTimeInsert: new Date().toTimeString().slice(0, 5),
-    },
-    select: { RowID: true },
+  if ((input.latitude == null) !== (input.longitude == null)) {
+    throw new Error("هر دو مختصات جغرافیایی باید وارد شوند.");
+  }
+  if (input.latitude != null && (input.latitude < -90 || input.latitude > 90)) {
+    throw new Error("عرض جغرافیایی معتبر نیست.");
+  }
+  if (input.longitude != null && (input.longitude < -180 || input.longitude > 180)) {
+    throw new Error("طول جغرافیایی معتبر نیست.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const address = await tx.orderDeliveryAddress.create({
+      data: {
+        Person: { connect: { RowID: personId } },
+        Province: { connect: { RowID: city.County.Province_ID } },
+        City: { connect: { RowID: city.RowID } },
+        DeliverToName: input.deliverToName.trim(),
+        DeliverToMobileNumber: input.deliverToMobileNumber.trim(),
+        DeliverToPhoneNumber: input.deliverToPhoneNumber?.trim() || null,
+        Adrs: input.Adrs.trim(),
+        PostalCode: input.PostalCode?.trim() || null,
+        RowDesc: input.RowDesc?.trim() || null,
+        FDateInsert: new Intl.DateTimeFormat("fa-IR-u-nu-latn", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replaceAll("-", "/"),
+        FTimeInsert: new Date().toTimeString().slice(0, 5),
+      },
+      select: { RowID: true },
+    });
+    if (input.latitude != null && input.longitude != null) {
+      await tx.$executeRaw(Prisma.sql`INSERT INTO dbo.SiteAddressGeo (Address_ID, Latitude, Longitude) VALUES (${address.RowID}, ${input.latitude}, ${input.longitude})`);
+    }
+    return address;
   });
 }

@@ -172,14 +172,25 @@ function mapProductStockInfo(row: ProductStockViewRow): ProductStockInfo {
   };
 }
 
-async function findProductsStockInfo(productIds: number[]): Promise<Map<number, ProductStockInfo[]>> {
+async function findProductsStockInfo(productIds: number[], branchId?: number): Promise<Map<number, ProductStockInfo[]>> {
   const stockInfoByProductId = new Map<number, ProductStockInfo[]>();
   if (productIds.length === 0) return stockInfoByProductId;
 
-  const appSettings = await prisma.appSettings.findFirst({
-    select: { SiteWareHouseID: true },
-  });
-  const warehouseId = appSettings?.SiteWareHouseID;
+  let warehouseId: number | null = null;
+
+  if (branchId !== undefined) {
+    const config = await prisma.$queryRaw<Array<{ Warehouse_ID: number }>>(Prisma.sql`
+      SELECT Warehouse_ID
+      FROM dbo.SiteBranchConfig
+      WHERE Branch_ID = ${branchId} AND IsActive = 1
+    `);
+    warehouseId = config[0]?.Warehouse_ID ?? null;
+  } else {
+    const appSettings = await prisma.appSettings.findFirst({
+      select: { SiteWareHouseID: true },
+    });
+    warehouseId = appSettings?.SiteWareHouseID ?? null;
+  }
 
   if (warehouseId == null) return stockInfoByProductId;
 
@@ -316,7 +327,7 @@ export async function findProducts(filters: ProductFilters) {
   const productIds = result.items.map((item) => item.RowID);
 
   const [stockInfoByProductId, ...imagesByProduct] = await Promise.all([
-    findProductsStockInfo(productIds),
+    findProductsStockInfo(productIds, filters.branchId),
     ...productIds.map((id) => findProductImages(id)),
   ]);
 
@@ -345,7 +356,7 @@ export async function findProductById(
   const [images, pricing, stockInfo] = await Promise.all([
     findProductImages(id),
     resolveProductPricing(product, options),
-    findProductStockInfo(id),
+    findProductStockInfo(id, options.branchId),
   ]);
 
   return { ...mapProduct(product), pricing, images, stockInfo };
@@ -364,7 +375,7 @@ export async function findProductByCode(
   const [images, pricing, stockInfo] = await Promise.all([
     findProductImages(product.RowID),
     resolveProductPricing(product, options),
-    findProductStockInfo(product.RowID),
+    findProductStockInfo(product.RowID, options.branchId),
   ]);
 
   return { ...mapProduct(product), pricing, images, stockInfo };
@@ -381,7 +392,7 @@ export async function getAmazingProducts(limit = 12, options: Pick<ProductFilter
   return Promise.all(products.map(async (product) => {
     const [images, stockInfo] = await Promise.all([
       findProductImages(product.RowID),
-      findProductStockInfo(product.RowID),
+      findProductStockInfo(product.RowID, options.branchId),
     ]);
     return { ...mapProduct(product), pricing: pricing.get(product.RowID)!, images, stockInfo };
   }));

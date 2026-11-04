@@ -159,3 +159,40 @@ export async function saveSiteBranchConfig(input: {
     `);
   });
 }
+
+
+export async function getAdminBranchOptions() {
+  return prisma.$queryRaw<Array<{
+    branchId: number;
+    branchName: string;
+    warehouseId: number;
+    warehouseName: string;
+    cityId: number | null;
+    cityName: string | null;
+    salePriceTypeId: number | null;
+    latitude: number | null;
+    longitude: number | null;
+    isActive: boolean | null;
+    isDefault: boolean | null;
+  }>>(Prisma.sql`
+    SELECT
+      branch.RowID AS branchId,
+      branch.RowName AS branchName,
+      warehouse.RowID AS warehouseId,
+      warehouse.RowName AS warehouseName,
+      config.City_ID AS cityId,
+      city.RowName AS cityName,
+      config.SalePriceType_ID AS salePriceTypeId,
+      config.Latitude AS latitude,
+      config.Longitude AS longitude,
+      config.IsActive AS isActive,
+      config.IsDefault AS isDefault
+    FROM dbo.Branch branch
+    INNER JOIN dbo.Warehouse warehouse
+      ON warehouse.Branch_ID = branch.RowID AND warehouse.IsActive = 1
+    LEFT JOIN dbo.SiteBranchConfig config ON config.Branch_ID = branch.RowID
+    LEFT JOIN dbo.City city ON city.RowID = config.City_ID
+    WHERE branch.IsActive = 1
+    ORDER BY branch.RowName, warehouse.RowName
+  `);
+}

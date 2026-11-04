@@ -653,9 +653,14 @@ async function createOrderInternal(
     Warehouse_ID: number;
     SalePriceType_ID: number | null;
   }>>(Prisma.sql`
-    SELECT Branch_ID, City_ID, Warehouse_ID, SalePriceType_ID
-    FROM dbo.SiteBranchConfig
-    WHERE Branch_ID = ${data.branchId} AND IsActive = 1
+    SELECT config.Branch_ID, config.City_ID, config.Warehouse_ID, config.SalePriceType_ID
+    FROM dbo.SiteBranchConfig config
+    INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID AND branch.IsActive = 1
+    INNER JOIN dbo.Warehouse warehouse
+      ON warehouse.RowID = config.Warehouse_ID
+      AND warehouse.Branch_ID = config.Branch_ID
+      AND warehouse.IsActive = 1
+    WHERE config.Branch_ID = ${data.branchId} AND config.IsActive = 1
   `);
 
   const branchConfig = branchConfigs[0];

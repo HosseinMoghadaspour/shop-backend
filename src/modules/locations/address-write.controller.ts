@@ -15,6 +15,8 @@ export async function createMyDeliveryAddress(c: Context) {
     Adrs?: string;
     PostalCode?: string;
     RowDesc?: string;
+    latitude?: number | null;
+    longitude?: number | null;
   } | null;
 
   if (!body || !Number.isSafeInteger(body.cityId) || !body.cityId ||
@@ -33,6 +35,8 @@ export async function createMyDeliveryAddress(c: Context) {
       Adrs: body.Adrs,
       PostalCode: body.PostalCode,
       RowDesc: body.RowDesc,
+      latitude: body.latitude == null ? null : Number(body.latitude),
+      longitude: body.longitude == null ? null : Number(body.longitude),
     });
     return c.json({ success: true, data: { id: Number(saved.RowID) } }, 201);
   } catch (error) {

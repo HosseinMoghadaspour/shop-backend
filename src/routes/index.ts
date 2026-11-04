@@ -23,6 +23,7 @@ import { adminSliderRoutes } from "../modules/slider/admin-slider.routes.js";
 import { adminFooterRoutes } from "../modules/footer/admin-footer.routes.js";
 import { adminBankAccountsRoutes } from "../modules/admin/bank-accounts/bank-accounts.routes.js";
 import { adminPaymentReceiptsRoutes } from "../modules/admin/payment-receipts/payment-receipts.routes.js";
+import { adminPaymentMethodsRoutes } from "../modules/admin/payment-methods/payment-methods.routes.js";
 
 type RouteEnv = {
   Variables: {
@@ -83,7 +84,7 @@ routes.route("/cart", cartRoutes);
 routes.route("/orders", ordersRoutes);
 routes.route("/order", ordersRoutes);
 routes.route("/locations", locationsRoutes);
-routes.route("/api/payment", paymentRoutes);
+routes.route("/payment", paymentRoutes);
 routes.route("/admin/products", adminProductRoutes);
 routes.route("/admin/categories", adminCategoryRoutes)
 routes.route("/admin/dashboard", adminDashboardRoutes);
@@ -91,3 +92,4 @@ routes.route("/admin/sliders", adminSliderRoutes);
 routes.route("/admin/footer", adminFooterRoutes);
 routes.route("/admin/bank-accounts", adminBankAccountsRoutes);
 routes.route("/admin/payment-receipts", adminPaymentReceiptsRoutes);
+routes.route("/admin/payment-methods", adminPaymentMethodsRoutes);

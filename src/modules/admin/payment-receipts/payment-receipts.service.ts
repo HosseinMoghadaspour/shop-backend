@@ -180,6 +180,7 @@ export async function approvePaymentReceipt(orderId: bigint) {
         DepositTrackingNumber: true,
         DepositBankAccount_ID: true,
         Fix_OrderPaymentConfirmationStatus_ID: true,
+        PayablePrice: true,
         Fix_OrderPaymentMethod: {
           select: {
             EnName: true,
@@ -219,6 +220,14 @@ export async function approvePaymentReceipt(orderId: bigint) {
     ) {
       throw new Error("مبلغ رسید معتبر نیست.");
     }
+    if (
+  order.PayablePrice == null ||
+  Number(order.DepositAmount) !== Number(order.PayablePrice)
+) {
+  throw new Error(
+    "مبلغ واریزی با مبلغ قابل پرداخت سفارش مطابقت ندارد.",
+  );
+}
 
     if (order.DepositBankAccount_ID === null) {
       throw new Error("حساب بانکی مقصد مشخص نشده است.");

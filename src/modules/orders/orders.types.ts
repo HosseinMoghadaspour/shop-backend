@@ -1,4 +1,5 @@
 export type OrderHRequest = {
+  branchId: number;
   totalPrice?: number;
   paymentMethodId: number;
 

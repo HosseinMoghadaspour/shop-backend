@@ -162,14 +162,14 @@ export async function saveSiteBranchConfig(input: {
 
 
 export async function getAdminBranchOptions() {
-  return prisma.$queryRaw<Array<{
+  const rows = await prisma.$queryRaw<Array<{
     branchId: number;
     branchName: string;
     warehouseId: number;
     warehouseName: string;
-    cityId: number | null;
+    cityId: bigint | null;
     cityName: string | null;
-    provinceId: number | null;
+    provinceId: bigint | null;
     salePriceTypeId: number | null;
     latitude: number | null;
     longitude: number | null;
@@ -198,4 +198,14 @@ export async function getAdminBranchOptions() {
     WHERE branch.IsActive = 1
     ORDER BY branch.RowName, warehouse.RowName
   `);
+  return rows.map((row) => ({
+    ...row,
+    branchId: Number(row.branchId),
+    warehouseId: Number(row.warehouseId),
+    cityId: row.cityId == null ? null : Number(row.cityId),
+    provinceId: row.provinceId == null ? null : Number(row.provinceId),
+    salePriceTypeId: row.salePriceTypeId == null ? null : Number(row.salePriceTypeId),
+    latitude: row.latitude == null ? null : Number(row.latitude),
+    longitude: row.longitude == null ? null : Number(row.longitude),
+  }));
 }

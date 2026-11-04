@@ -186,10 +186,27 @@ async function findProductsStockInfo(productIds: number[], branchId?: number): P
     `);
     warehouseId = config[0]?.Warehouse_ID ?? null;
   } else {
-    const appSettings = await prisma.appSettings.findFirst({
-      select: { SiteWareHouseID: true },
-    });
-    warehouseId = appSettings?.SiteWareHouseID ?? null;
+    const defaultConfig = await prisma.$queryRaw<Array<{ Warehouse_ID: number }>>(Prisma.sql`
+      SELECT TOP 1 config.Warehouse_ID
+      FROM dbo.SiteBranchConfig config
+      INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID
+      INNER JOIN dbo.Warehouse warehouse
+        ON warehouse.RowID = config.Warehouse_ID
+        AND warehouse.Branch_ID = config.Branch_ID
+        AND warehouse.IsActive = 1
+      WHERE config.IsActive = 1
+        AND config.IsDefault = 1
+        AND branch.IsActive = 1
+      ORDER BY config.Branch_ID
+    `);
+    if (defaultConfig[0]) {
+      warehouseId = Number(defaultConfig[0].Warehouse_ID);
+    } else {
+      const appSettings = await prisma.appSettings.findFirst({
+        select: { SiteWareHouseID: true },
+      });
+      warehouseId = appSettings?.SiteWareHouseID ?? null;
+    }
   }
 
   if (warehouseId == null) return stockInfoByProductId;

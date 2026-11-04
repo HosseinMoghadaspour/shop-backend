@@ -17,7 +17,7 @@ export async function getBranches(c: Context) {
   }
   const branches = await listSiteBranches(cityId, latitude, longitude);
   const defaultBranchId = branches.find((branch) => branch.isDefault)?.id ??
-    (latitude !== undefined && longitude !== undefined ? branches[0]?.id ?? null : null);
+    (latitude !== undefined && longitude !== undefined && branches[0]?.distanceKm != null ? branches[0].id : null);
   return c.json({ success: true, data: branches, defaultBranchId });
 }
 

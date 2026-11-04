@@ -16,8 +16,10 @@ export async function getBranches(c: Context) {
     return c.json({ success: false, message: "مختصات جغرافیایی معتبر نیست." }, 400);
   }
   const branches = await listSiteBranches(cityId, latitude, longitude);
-  const defaultBranchId = branches.find((branch) => branch.isDefault)?.id ??
-    (latitude !== undefined && longitude !== undefined && branches[0]?.distanceKm != null ? branches[0].id : null);
+  const nearestBranchId = latitude !== undefined && longitude !== undefined && branches[0]?.distanceKm != null
+    ? branches[0].id
+    : null;
+  const defaultBranchId = nearestBranchId ?? branches.find((branch) => branch.isDefault)?.id ?? null;
   return c.json({ success: true, data: branches, defaultBranchId });
 }
 

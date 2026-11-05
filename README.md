@@ -47,12 +47,11 @@ GET /products/:id
 GET /products/code/:code
 ```
 
-برای انتخاب قیمت شعبه یا Price Type می‌توان از این queryها استفاده کرد:
+برای دریافت قیمت شعبه، `branchId` را ارسال کنید تا نوع قیمت تنظیم‌شده برای همان شعبه اعمال شود. `salePriceTypeId` فقط وقتی استفاده می‌شود که `branchId` صریحاً ارسال نشده باشد:
 
 ```text
 ?branchId=1
 ?salePriceTypeId=2
-?branchId=1&salePriceTypeId=2
 ```
 
 ### Special lists
@@ -66,7 +65,7 @@ GET /products/new?limit=12
 
 ## Pricing
 
-قیمت پایه از `Good` خوانده می‌شود. در صورت وجود قیمت شعبه، قیمت شعبه روی قیمت پایه اعمال می‌شود. اگر `salePriceTypeId` صریحاً ارسال نشده باشد، نوع قیمت تنظیم‌شده در `SiteBranchConfig` همان شعبه به‌صورت خودکار اعمال می‌شود. قیمت Price Type اولویت بالاتری دارد. سپس `DiscountPrice` معتبر بررسی و `finalPrice` محاسبه می‌شود.
+قیمت پایه از `Good` خوانده می‌شود. در صورت وجود قیمت شعبه، قیمت شعبه روی قیمت پایه اعمال می‌شود. وقتی `branchId` ارسال شده باشد، نوع قیمت ثبت‌شده در `SiteBranchConfig` همان شعبه مبناست و `salePriceTypeId` ارسالی نمی‌تواند تنظیم شعبه را دور بزند. اگر `branchId` ارسال نشود، `salePriceTypeId` صریح یا نوع قیمت شعبه پیش‌فرض اعمال می‌شود. سپس `DiscountPrice` معتبر بررسی و `finalPrice` محاسبه می‌شود.
 
 برای جلوگیری از N+1، قیمت شعبه و Price Type در لیست محصولات به صورت batch خوانده می‌شوند.
 

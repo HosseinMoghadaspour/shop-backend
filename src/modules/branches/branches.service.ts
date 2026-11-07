@@ -169,6 +169,7 @@ export async function saveSiteBranchConfig(input: {
   longitude: number | null;
   isActive: boolean;
   isDefault: boolean;
+  address: string | null;
 }) {
   if ((input.latitude === null) !== (input.longitude === null)) {
     throw new Error("طول و عرض جغرافیایی باید هر دو وارد شوند.");
@@ -215,6 +216,12 @@ export async function saveSiteBranchConfig(input: {
   const isDefault = input.isActive && input.isDefault;
 
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE dbo.Branch
+      SET RowDesc = ${input.address}
+      WHERE RowID = ${input.branchId}
+    `);
+
     if (isDefault) {
       await tx.$executeRaw(Prisma.sql`
         UPDATE dbo.SiteBranchConfig
@@ -254,6 +261,7 @@ export async function getAdminBranchOptions() {
   const rows = await prisma.$queryRaw<Array<{
     branchId: number;
     branchName: string;
+    description: string | null;
     warehouseId: number | null;
     warehouseName: string | null;
     configuredWarehouseId: number | null;
@@ -269,6 +277,7 @@ export async function getAdminBranchOptions() {
     SELECT
       branch.RowID AS branchId,
       branch.RowName AS branchName,
+      branch.RowDesc AS description,
       warehouse.RowID AS warehouseId,
       warehouse.RowName AS warehouseName,
       config.Warehouse_ID AS configuredWarehouseId,

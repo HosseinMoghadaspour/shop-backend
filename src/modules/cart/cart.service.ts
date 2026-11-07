@@ -200,6 +200,7 @@ async function buildCartResponse(
 
       SalePrice: true,
       DiscountPrice: true,
+      ConsumerPrice: true,
 
       MinOrderSite: true,
       MaxOrderSite: true,

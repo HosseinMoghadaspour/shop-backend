@@ -162,7 +162,9 @@ export async function createAddressForPerson(personId: number, input: {
     where: { RowID: BigInt(input.cityId), IsActive: true },
     select: { RowID: true, County: { select: { Province_ID: true } } },
   });
-  if (!city?.County?.Province_ID) {
+  const provinceId = city?.County?.Province_ID;
+
+  if (provinceId == null) {
     throw new Error("شهر انتخاب‌شده معتبر نیست.");
   }
   if (!input.deliverToName.trim() || !input.deliverToMobileNumber.trim() || !input.Adrs.trim()) {
@@ -181,7 +183,7 @@ export async function createAddressForPerson(personId: number, input: {
     const address = await tx.orderDeliveryAddress.create({
       data: {
         Person: { connect: { RowID: personId } },
-        Province: { connect: { RowID: city.County.Province_ID } },
+        Province: { connect: { RowID: provinceId } },
         City: { connect: { RowID: city.RowID } },
         DeliverToName: input.deliverToName.trim(),
         DeliverToMobileNumber: input.deliverToMobileNumber.trim(),

@@ -42,9 +42,8 @@ function mapBranch(row: BranchRow): SiteBranch {
 
 /**
  * Customer-facing branches:
- * Branch is the source of branch identity. Only branches with an active
- * online-store configuration and an active accounting warehouse are
- * available for shopping.
+ * Branch is the source of branch identity. Availability depends only on the
+ * active branch configuration and city, never on a branch-to-warehouse link.
  */
 export async function listSiteBranches(
   cityId: number,
@@ -82,13 +81,6 @@ export async function listSiteBranches(
     WHERE branch.IsActive = 1
       AND config.City_ID = ${cityId}
       AND config.IsActive = 1
-      AND EXISTS (
-        SELECT 1
-        FROM dbo.Warehouse warehouse
-        WHERE warehouse.RowID = config.Warehouse_ID
-          AND warehouse.Branch_ID = branch.RowID
-          AND warehouse.IsActive = 1
-      )
     ORDER BY
       CASE
         WHEN ${hasCoordinates ? 1 : 0} = 1
@@ -202,30 +194,9 @@ export async function saveSiteBranchConfig(input: {
     throw new Error("شعبه یا شهر انتخاب‌شده معتبر نیست.");
   }
 
-  // Warehouse remains an internal accounting dependency only. Preserve the
-  // current active mapping, or select an active warehouse for this branch
-  // automatically; it is never selected or managed in the admin UI.
-  const warehouseRows = await prisma.$queryRaw<
-    Array<{ Warehouse_ID: number }>
-  >(Prisma.sql`
-    SELECT TOP (1) warehouse.RowID AS Warehouse_ID
-    FROM dbo.Warehouse warehouse
-    LEFT JOIN dbo.SiteBranchConfig config
-      ON config.Branch_ID = ${input.branchId}
-    WHERE warehouse.Branch_ID = ${input.branchId}
-      AND warehouse.IsActive = 1
-    ORDER BY
-      CASE WHEN warehouse.RowID = config.Warehouse_ID THEN 0 ELSE 1 END,
-      warehouse.RowID
-  `);
-
-  const warehouseId = warehouseRows[0]?.Warehouse_ID;
-  if (warehouseId == null) {
-    throw new Error(
-      "برای این شعبه در سیستم حسابداری انبار فعالی تعریف نشده است.",
-    );
-  }
-
+  // Branch configuration is independent from warehouses. The legacy
+  // Warehouse_ID column is kept nullable for backward compatibility only.
+  
   if (input.salePriceTypeId !== null) {
     const validPriceType = await prisma.$queryRaw<Array<{ RowID: bigint }>>(
       Prisma.sql`
@@ -272,7 +243,7 @@ export async function saveSiteBranchConfig(input: {
         UPDATE dbo.SiteBranchConfig
         SET
           City_ID = ${input.cityId},
-          Warehouse_ID = ${warehouseId},
+          Warehouse_ID = NULL,
           SalePriceType_ID = ${input.salePriceTypeId},
           Latitude = ${input.latitude},
           Longitude = ${input.longitude},
@@ -284,7 +255,7 @@ export async function saveSiteBranchConfig(input: {
         INSERT INTO dbo.SiteBranchConfig
           (Branch_ID, City_ID, Warehouse_ID, SalePriceType_ID, Latitude, Longitude, IsActive, IsDefault)
         VALUES
-          (${input.branchId}, ${input.cityId}, ${warehouseId}, ${input.salePriceTypeId},
+          (${input.branchId}, ${input.cityId}, NULL, ${input.salePriceTypeId},
            ${input.latitude}, ${input.longitude}, ${input.isActive}, ${isDefault})
     `);
   });

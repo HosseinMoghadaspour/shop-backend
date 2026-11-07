@@ -905,6 +905,16 @@ async function createOrderInternal(
     );
   }
 
+  const activeAccountingWarehouse = await prisma.warehouse.findFirst({
+    where: { RowID: warehouseId, IsActive: true },
+    select: { RowID: true },
+  });
+  if (!activeAccountingWarehouse) {
+    throw new Error(
+      "انبار عمومی فروشگاه در تنظیمات حسابداری فعال یا معتبر نیست.",
+    );
+  }
+
   const orderResponse =
     await prisma.$transaction(
       async (tx) => {

@@ -383,7 +383,7 @@ export async function getAmazingProducts(limit = 12, options: Pick<ProductFilter
   return Promise.all(products.map(async (product) => {
     const [images, stockInfo] = await Promise.all([
       findProductImages(product.RowID),
-      findProductStockInfo(product.RowID, options.branchId),
+      findProductStockInfo(product.RowID),
     ]);
     return { ...mapProduct(product), pricing: pricing.get(product.RowID)!, images, stockInfo };
   }));
@@ -400,7 +400,7 @@ export async function getNewProducts(limit = 12, options: Pick<ProductFilters, "
   return Promise.all(products.map(async (product) => {
     const [images, stockInfo] = await Promise.all([
       findProductImages(product.RowID),
-      findProductStockInfo(product.RowID, options.branchId),
+      findProductStockInfo(product.RowID),
     ]);
     return { ...mapProduct(product), pricing: pricing.get(product.RowID)!, images, stockInfo };
   }));

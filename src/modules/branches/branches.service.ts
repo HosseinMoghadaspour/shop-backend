@@ -42,11 +42,17 @@ function mapBranch(row: BranchRow): SiteBranch {
   };
 }
 
+/**
+ * Customer-facing branches:
+ * The Branch table is the source of branch identity, while only branches
+ * with an active and complete SiteBranchConfig can be selected for shopping.
+ */
 export async function listSiteBranches(cityId: number, latitude?: number, longitude?: number) {
   const hasCoordinates = latitude !== undefined && longitude !== undefined;
+
   const rows = await prisma.$queryRaw<BranchRow[]>(Prisma.sql`
     SELECT
-      config.Branch_ID,
+      branch.RowID AS Branch_ID,
       branch.RowName AS BranchName,
       config.City_ID,
       city.RowName AS CityName,
@@ -56,40 +62,68 @@ export async function listSiteBranches(cityId: number, latitude?: number, longit
       config.Longitude,
       config.IsDefault,
       ${hasCoordinates
-        ? Prisma.sql`CASE WHEN config.Latitude IS NULL OR config.Longitude IS NULL THEN NULL ELSE
-          6371.0 * 2 * ASIN(SQRT(
-            POWER(SIN(RADIANS(config.Latitude - ${latitude!}) / 2), 2) +
-            COS(RADIANS(${latitude!})) * COS(RADIANS(config.Latitude)) *
-            POWER(SIN(RADIANS(config.Longitude - ${longitude!}) / 2), 2)
-          )) END`
+        ? Prisma.sql`CASE
+            WHEN config.Latitude IS NULL OR config.Longitude IS NULL THEN NULL
+            ELSE 6371.0 * 2 * ASIN(SQRT(
+              POWER(SIN(RADIANS(config.Latitude - ${latitude!}) / 2), 2) +
+              COS(RADIANS(${latitude!})) * COS(RADIANS(config.Latitude)) *
+              POWER(SIN(RADIANS(config.Longitude - ${longitude!}) / 2), 2)
+            ))
+          END`
         : Prisma.sql`CAST(NULL AS FLOAT)`} AS DistanceKm
-    FROM dbo.SiteBranchConfig config
-    INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID
-    INNER JOIN dbo.City city ON city.RowID = config.City_ID
-    WHERE config.City_ID = ${cityId}
+    FROM dbo.Branch branch
+    LEFT JOIN dbo.SiteBranchConfig config
+      ON config.Branch_ID = branch.RowID
+    INNER JOIN dbo.City city
+      ON city.RowID = config.City_ID
       AND city.IsActive = 1
+    WHERE branch.IsActive = 1
+      AND config.City_ID = ${cityId}
       AND config.IsActive = 1
-      AND branch.IsActive = 1
       AND EXISTS (
-        SELECT 1 FROM dbo.Warehouse warehouse
+        SELECT 1
+        FROM dbo.Warehouse warehouse
         WHERE warehouse.RowID = config.Warehouse_ID
-          AND warehouse.Branch_ID = config.Branch_ID
+          AND warehouse.Branch_ID = branch.RowID
           AND warehouse.IsActive = 1
       )
     ORDER BY
-      CASE WHEN ${hasCoordinates ? 1 : 0} = 1 AND config.Latitude IS NOT NULL AND config.Longitude IS NOT NULL THEN 0 ELSE 1 END,
+      CASE
+        WHEN ${hasCoordinates ? 1 : 0} = 1
+          AND config.Latitude IS NOT NULL
+          AND config.Longitude IS NOT NULL
+        THEN 0 ELSE 1
+      END,
       DistanceKm,
       config.IsDefault DESC,
       branch.RowName ASC
   `);
+
   return rows.map(mapBranch);
 }
 
 export async function listAllSiteBranchConfigs() {
-  const rows = await prisma.$queryRaw<BranchRow[]>(Prisma.sql`
+  const rows = await prisma.$queryRaw<Array<{
+    Branch_ID: number;
+    BranchName: string;
+    BranchDesc: string | null;
+    BranchAddress: string | null;
+    MainBranch: boolean | null;
+    City_ID: number | null;
+    CityName: string | null;
+    Warehouse_ID: number | null;
+    SalePriceType_ID: number | null;
+    Latitude: number | null;
+    Longitude: number | null;
+    IsDefault: boolean | null;
+    IsConfigured: boolean;
+  }>>(Prisma.sql`
     SELECT
-      config.Branch_ID,
+      branch.RowID AS Branch_ID,
       branch.RowName AS BranchName,
+      branch.RowDesc AS BranchDesc,
+      branch.Address AS BranchAddress,
+      branch.MainBranch,
       config.City_ID,
       city.RowName AS CityName,
       config.Warehouse_ID,
@@ -97,13 +131,33 @@ export async function listAllSiteBranchConfigs() {
       config.Latitude,
       config.Longitude,
       config.IsDefault,
-      CAST(NULL AS FLOAT) AS DistanceKm
-    FROM dbo.SiteBranchConfig config
-    INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID
-    INNER JOIN dbo.City city ON city.RowID = config.City_ID
-    ORDER BY city.RowName, branch.RowName
+      CAST(CASE WHEN config.Branch_ID IS NULL THEN 0 ELSE 1 END AS BIT) AS IsConfigured
+    FROM dbo.Branch branch
+    LEFT JOIN dbo.SiteBranchConfig config
+      ON config.Branch_ID = branch.RowID
+    LEFT JOIN dbo.City city
+      ON city.RowID = config.City_ID
+    WHERE branch.IsActive = 1
+    ORDER BY
+      CASE WHEN branch.MainBranch = 1 THEN 0 ELSE 1 END,
+      branch.RowName
   `);
-  return rows.map(mapBranch);
+
+  return rows.map((row) => ({
+    id: Number(row.Branch_ID),
+    name: row.BranchName,
+    description: row.BranchDesc,
+    address: row.BranchAddress,
+    isMainBranch: row.MainBranch == null ? false : Boolean(row.MainBranch),
+    cityId: row.City_ID == null ? null : Number(row.City_ID),
+    cityName: row.CityName,
+    warehouseId: row.Warehouse_ID == null ? null : Number(row.Warehouse_ID),
+    salePriceTypeId: row.SalePriceType_ID == null ? null : Number(row.SalePriceType_ID),
+    latitude: row.Latitude == null ? null : Number(row.Latitude),
+    longitude: row.Longitude == null ? null : Number(row.Longitude),
+    isDefault: Boolean(row.IsDefault),
+    isConfigured: Boolean(row.IsConfigured),
+  }));
 }
 
 export async function saveSiteBranchConfig(input: {
@@ -129,14 +183,20 @@ export async function saveSiteBranchConfig(input: {
   const valid = await prisma.$queryRaw<Array<{ Branch_ID: number }>>(Prisma.sql`
     SELECT branch.RowID AS Branch_ID
     FROM dbo.Branch branch
-    INNER JOIN dbo.City city ON city.RowID = ${input.cityId} AND city.IsActive = 1
+    INNER JOIN dbo.City city
+      ON city.RowID = ${input.cityId}
+      AND city.IsActive = 1
     INNER JOIN dbo.Warehouse warehouse
       ON warehouse.RowID = ${input.warehouseId}
       AND warehouse.Branch_ID = branch.RowID
       AND warehouse.IsActive = 1
-    WHERE branch.RowID = ${input.branchId} AND branch.IsActive = 1
+    WHERE branch.RowID = ${input.branchId}
+      AND branch.IsActive = 1
   `);
-  if (!valid.length) throw new Error("شعبه، شهر یا انبار انتخاب‌شده معتبر نیست.");
+
+  if (!valid.length) {
+    throw new Error("شعبه، شهر یا انبار انتخاب‌شده معتبر نیست.");
+  }
 
   if (input.salePriceTypeId !== null) {
     const validPriceType = await prisma.$queryRaw<Array<{ RowID: bigint }>>(Prisma.sql`
@@ -146,6 +206,7 @@ export async function saveSiteBranchConfig(input: {
         AND IsActive = 1
         AND (BranchID IS NULL OR BranchID = ${input.branchId})
     `);
+
     if (!validPriceType.length) {
       throw new Error("نوع قیمت انتخاب‌شده فعال نیست یا به شعبه دیگری تعلق دارد.");
     }
@@ -156,15 +217,28 @@ export async function saveSiteBranchConfig(input: {
   await prisma.$transaction(async (tx) => {
     if (isDefault) {
       await tx.$executeRaw(Prisma.sql`
-        UPDATE dbo.SiteBranchConfig SET IsDefault = 0 WHERE City_ID = ${input.cityId}
+        UPDATE dbo.SiteBranchConfig
+        SET IsDefault = 0
+        WHERE City_ID = ${input.cityId}
       `);
     }
+
     await tx.$executeRaw(Prisma.sql`
-      IF EXISTS (SELECT 1 FROM dbo.SiteBranchConfig WHERE Branch_ID = ${input.branchId})
+      IF EXISTS (
+        SELECT 1
+        FROM dbo.SiteBranchConfig
+        WHERE Branch_ID = ${input.branchId}
+      )
         UPDATE dbo.SiteBranchConfig
-        SET City_ID = ${input.cityId}, Warehouse_ID = ${input.warehouseId},
-            SalePriceType_ID = ${input.salePriceTypeId}, Latitude = ${input.latitude},
-            Longitude = ${input.longitude}, IsActive = ${input.isActive}, IsDefault = ${isDefault}, UpdatedAt = SYSUTCDATETIME()
+        SET
+          City_ID = ${input.cityId},
+          Warehouse_ID = ${input.warehouseId},
+          SalePriceType_ID = ${input.salePriceTypeId},
+          Latitude = ${input.latitude},
+          Longitude = ${input.longitude},
+          IsActive = ${input.isActive},
+          IsDefault = ${isDefault},
+          UpdatedAt = SYSUTCDATETIME()
         WHERE Branch_ID = ${input.branchId}
       ELSE
         INSERT INTO dbo.SiteBranchConfig
@@ -176,13 +250,12 @@ export async function saveSiteBranchConfig(input: {
   });
 }
 
-
 export async function getAdminBranchOptions() {
   const rows = await prisma.$queryRaw<Array<{
     branchId: number;
     branchName: string;
-    warehouseId: number;
-    warehouseName: string;
+    warehouseId: number | null;
+    warehouseName: string | null;
     configuredWarehouseId: number | null;
     cityId: bigint | null;
     cityName: string | null;
@@ -208,19 +281,26 @@ export async function getAdminBranchOptions() {
       config.IsActive AS isActive,
       config.IsDefault AS isDefault
     FROM dbo.Branch branch
-    INNER JOIN dbo.Warehouse warehouse
-      ON warehouse.Branch_ID = branch.RowID AND warehouse.IsActive = 1
-    LEFT JOIN dbo.SiteBranchConfig config ON config.Branch_ID = branch.RowID
-    LEFT JOIN dbo.City city ON city.RowID = config.City_ID
-    LEFT JOIN dbo.County county ON county.RowID = city.County_ID
+    LEFT JOIN dbo.Warehouse warehouse
+      ON warehouse.Branch_ID = branch.RowID
+      AND warehouse.IsActive = 1
+    LEFT JOIN dbo.SiteBranchConfig config
+      ON config.Branch_ID = branch.RowID
+    LEFT JOIN dbo.City city
+      ON city.RowID = config.City_ID
+    LEFT JOIN dbo.County county
+      ON county.RowID = city.County_ID
     WHERE branch.IsActive = 1
     ORDER BY branch.RowName, warehouse.RowName
   `);
+
   return rows.map((row) => ({
     ...row,
     branchId: Number(row.branchId),
-    warehouseId: Number(row.warehouseId),
-    configuredWarehouseId: row.configuredWarehouseId == null ? null : Number(row.configuredWarehouseId),
+    warehouseId: row.warehouseId == null ? null : Number(row.warehouseId),
+    configuredWarehouseId: row.configuredWarehouseId == null
+      ? null
+      : Number(row.configuredWarehouseId),
     cityId: row.cityId == null ? null : Number(row.cityId),
     provinceId: row.provinceId == null ? null : Number(row.provinceId),
     salePriceTypeId: row.salePriceTypeId == null ? null : Number(row.salePriceTypeId),

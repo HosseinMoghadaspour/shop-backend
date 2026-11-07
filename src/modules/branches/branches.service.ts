@@ -6,7 +6,6 @@ export type SiteBranch = {
   name: string;
   cityId: number;
   cityName: string;
-  warehouseId: number;
   salePriceTypeId: number | null;
   latitude: number | null;
   longitude: number | null;
@@ -19,7 +18,6 @@ type BranchRow = {
   BranchName: string;
   City_ID: number;
   CityName: string;
-  Warehouse_ID: number;
   SalePriceType_ID: number | null;
   Latitude: number | null;
   Longitude: number | null;
@@ -33,8 +31,8 @@ function mapBranch(row: BranchRow): SiteBranch {
     name: row.BranchName,
     cityId: Number(row.City_ID),
     cityName: row.CityName,
-    warehouseId: Number(row.Warehouse_ID),
-    salePriceTypeId: row.SalePriceType_ID == null ? null : Number(row.SalePriceType_ID),
+    salePriceTypeId:
+      row.SalePriceType_ID == null ? null : Number(row.SalePriceType_ID),
     latitude: row.Latitude == null ? null : Number(row.Latitude),
     longitude: row.Longitude == null ? null : Number(row.Longitude),
     isDefault: Boolean(row.IsDefault),
@@ -44,10 +42,15 @@ function mapBranch(row: BranchRow): SiteBranch {
 
 /**
  * Customer-facing branches:
- * The Branch table is the source of branch identity, while only branches
- * with an active and complete SiteBranchConfig can be selected for shopping.
+ * Branch is the source of branch identity. Only branches with an active
+ * online-store configuration and an active accounting warehouse are
+ * available for shopping.
  */
-export async function listSiteBranches(cityId: number, latitude?: number, longitude?: number) {
+export async function listSiteBranches(
+  cityId: number,
+  latitude?: number,
+  longitude?: number,
+) {
   const hasCoordinates = latitude !== undefined && longitude !== undefined;
 
   const rows = await prisma.$queryRaw<BranchRow[]>(Prisma.sql`
@@ -56,7 +59,6 @@ export async function listSiteBranches(cityId: number, latitude?: number, longit
       branch.RowName AS BranchName,
       config.City_ID,
       city.RowName AS CityName,
-      config.Warehouse_ID,
       config.SalePriceType_ID,
       config.Latitude,
       config.Longitude,
@@ -111,7 +113,6 @@ export async function listAllSiteBranchConfigs() {
     MainBranch: boolean | null;
     City_ID: number | null;
     CityName: string | null;
-    Warehouse_ID: number | null;
     SalePriceType_ID: number | null;
     Latitude: number | null;
     Longitude: number | null;
@@ -126,7 +127,6 @@ export async function listAllSiteBranchConfigs() {
       branch.MainBranch,
       config.City_ID,
       city.RowName AS CityName,
-      config.Warehouse_ID,
       config.SalePriceType_ID,
       config.Latitude,
       config.Longitude,
@@ -151,8 +151,8 @@ export async function listAllSiteBranchConfigs() {
     isMainBranch: row.MainBranch == null ? false : Boolean(row.MainBranch),
     cityId: row.City_ID == null ? null : Number(row.City_ID),
     cityName: row.CityName,
-    warehouseId: row.Warehouse_ID == null ? null : Number(row.Warehouse_ID),
-    salePriceTypeId: row.SalePriceType_ID == null ? null : Number(row.SalePriceType_ID),
+    salePriceTypeId:
+      row.SalePriceType_ID == null ? null : Number(row.SalePriceType_ID),
     latitude: row.Latitude == null ? null : Number(row.Latitude),
     longitude: row.Longitude == null ? null : Number(row.Longitude),
     isDefault: Boolean(row.IsDefault),
@@ -163,7 +163,6 @@ export async function listAllSiteBranchConfigs() {
 export async function saveSiteBranchConfig(input: {
   branchId: number;
   cityId: number;
-  warehouseId: number;
   salePriceTypeId: number | null;
   latitude: number | null;
   longitude: number | null;
@@ -174,42 +173,74 @@ export async function saveSiteBranchConfig(input: {
   if ((input.latitude === null) !== (input.longitude === null)) {
     throw new Error("طول و عرض جغرافیایی باید هر دو وارد شوند.");
   }
-  if (input.latitude !== null && (input.latitude < -90 || input.latitude > 90)) {
+  if (
+    input.latitude !== null &&
+    (input.latitude < -90 || input.latitude > 90)
+  ) {
     throw new Error("عرض جغرافیایی معتبر نیست.");
   }
-  if (input.longitude !== null && (input.longitude < -180 || input.longitude > 180)) {
+  if (
+    input.longitude !== null &&
+    (input.longitude < -180 || input.longitude > 180)
+  ) {
     throw new Error("طول جغرافیایی معتبر نیست.");
   }
 
-  const valid = await prisma.$queryRaw<Array<{ Branch_ID: number }>>(Prisma.sql`
-    SELECT branch.RowID AS Branch_ID
-    FROM dbo.Branch branch
-    INNER JOIN dbo.City city
-      ON city.RowID = ${input.cityId}
-      AND city.IsActive = 1
-    INNER JOIN dbo.Warehouse warehouse
-      ON warehouse.RowID = ${input.warehouseId}
-      AND warehouse.Branch_ID = branch.RowID
+  const validBranch = await prisma.$queryRaw<Array<{ Branch_ID: number }>>(
+    Prisma.sql`
+      SELECT branch.RowID AS Branch_ID
+      FROM dbo.Branch branch
+      INNER JOIN dbo.City city
+        ON city.RowID = ${input.cityId}
+        AND city.IsActive = 1
+      WHERE branch.RowID = ${input.branchId}
+        AND branch.IsActive = 1
+    `,
+  );
+
+  if (!validBranch.length) {
+    throw new Error("شعبه یا شهر انتخاب‌شده معتبر نیست.");
+  }
+
+  // Warehouse remains an internal accounting dependency only. Preserve the
+  // current active mapping, or select an active warehouse for this branch
+  // automatically; it is never selected or managed in the admin UI.
+  const warehouseRows = await prisma.$queryRaw<
+    Array<{ Warehouse_ID: number }>
+  >(Prisma.sql`
+    SELECT TOP (1) warehouse.RowID AS Warehouse_ID
+    FROM dbo.Warehouse warehouse
+    LEFT JOIN dbo.SiteBranchConfig config
+      ON config.Branch_ID = ${input.branchId}
+    WHERE warehouse.Branch_ID = ${input.branchId}
       AND warehouse.IsActive = 1
-    WHERE branch.RowID = ${input.branchId}
-      AND branch.IsActive = 1
+    ORDER BY
+      CASE WHEN warehouse.RowID = config.Warehouse_ID THEN 0 ELSE 1 END,
+      warehouse.RowID
   `);
 
-  if (!valid.length) {
-    throw new Error("شعبه، شهر یا انبار انتخاب‌شده معتبر نیست.");
+  const warehouseId = warehouseRows[0]?.Warehouse_ID;
+  if (warehouseId == null) {
+    throw new Error(
+      "برای این شعبه در سیستم حسابداری انبار فعالی تعریف نشده است.",
+    );
   }
 
   if (input.salePriceTypeId !== null) {
-    const validPriceType = await prisma.$queryRaw<Array<{ RowID: bigint }>>(Prisma.sql`
-      SELECT RowID
-      FROM dbo.SalePriceType
-      WHERE RowID = ${input.salePriceTypeId}
-        AND IsActive = 1
-        AND (BranchID IS NULL OR BranchID = ${input.branchId})
-    `);
+    const validPriceType = await prisma.$queryRaw<Array<{ RowID: bigint }>>(
+      Prisma.sql`
+        SELECT RowID
+        FROM dbo.SalePriceType
+        WHERE RowID = ${input.salePriceTypeId}
+          AND IsActive = 1
+          AND (BranchID IS NULL OR BranchID = ${input.branchId})
+      `,
+    );
 
     if (!validPriceType.length) {
-      throw new Error("نوع قیمت انتخاب‌شده فعال نیست یا به شعبه دیگری تعلق دارد.");
+      throw new Error(
+        "نوع قیمت انتخاب‌شده فعال نیست یا به شعبه دیگری تعلق دارد.",
+      );
     }
   }
 
@@ -241,7 +272,7 @@ export async function saveSiteBranchConfig(input: {
         UPDATE dbo.SiteBranchConfig
         SET
           City_ID = ${input.cityId},
-          Warehouse_ID = ${input.warehouseId},
+          Warehouse_ID = ${warehouseId},
           SalePriceType_ID = ${input.salePriceTypeId},
           Latitude = ${input.latitude},
           Longitude = ${input.longitude},
@@ -253,7 +284,7 @@ export async function saveSiteBranchConfig(input: {
         INSERT INTO dbo.SiteBranchConfig
           (Branch_ID, City_ID, Warehouse_ID, SalePriceType_ID, Latitude, Longitude, IsActive, IsDefault)
         VALUES
-          (${input.branchId}, ${input.cityId}, ${input.warehouseId}, ${input.salePriceTypeId},
+          (${input.branchId}, ${input.cityId}, ${warehouseId}, ${input.salePriceTypeId},
            ${input.latitude}, ${input.longitude}, ${input.isActive}, ${isDefault})
     `);
   });
@@ -264,9 +295,6 @@ export async function getAdminBranchOptions() {
     branchId: number;
     branchName: string;
     description: string | null;
-    warehouseId: number | null;
-    warehouseName: string | null;
-    configuredWarehouseId: number | null;
     cityId: bigint | null;
     cityName: string | null;
     provinceId: bigint | null;
@@ -280,9 +308,6 @@ export async function getAdminBranchOptions() {
       branch.RowID AS branchId,
       branch.RowName AS branchName,
       branch.RowDesc AS description,
-      warehouse.RowID AS warehouseId,
-      warehouse.RowName AS warehouseName,
-      config.Warehouse_ID AS configuredWarehouseId,
       config.City_ID AS cityId,
       city.RowName AS cityName,
       county.Province_ID AS provinceId,
@@ -292,9 +317,6 @@ export async function getAdminBranchOptions() {
       config.IsActive AS isActive,
       config.IsDefault AS isDefault
     FROM dbo.Branch branch
-    LEFT JOIN dbo.Warehouse warehouse
-      ON warehouse.Branch_ID = branch.RowID
-      AND warehouse.IsActive = 1
     LEFT JOIN dbo.SiteBranchConfig config
       ON config.Branch_ID = branch.RowID
     LEFT JOIN dbo.City city
@@ -302,19 +324,16 @@ export async function getAdminBranchOptions() {
     LEFT JOIN dbo.County county
       ON county.RowID = city.County_ID
     WHERE branch.IsActive = 1
-    ORDER BY branch.RowName, warehouse.RowName
+    ORDER BY branch.RowName
   `);
 
   return rows.map((row) => ({
     ...row,
     branchId: Number(row.branchId),
-    warehouseId: row.warehouseId == null ? null : Number(row.warehouseId),
-    configuredWarehouseId: row.configuredWarehouseId == null
-      ? null
-      : Number(row.configuredWarehouseId),
     cityId: row.cityId == null ? null : Number(row.cityId),
     provinceId: row.provinceId == null ? null : Number(row.provinceId),
-    salePriceTypeId: row.salePriceTypeId == null ? null : Number(row.salePriceTypeId),
+    salePriceTypeId:
+      row.salePriceTypeId == null ? null : Number(row.salePriceTypeId),
     latitude: row.latitude == null ? null : Number(row.latitude),
     longitude: row.longitude == null ? null : Number(row.longitude),
   }));

@@ -38,7 +38,7 @@ export async function putAdminBranch(c: Context) {
   const salePriceTypeId = body?.salePriceTypeId == null ? null : Number(body.salePriceTypeId);
   const latitude = body?.latitude == null || body.latitude === "" ? null : Number(body.latitude);
   const longitude = body?.longitude == null || body.longitude === "" ? null : Number(body.longitude);
-  const address = typeof body?.address === "string" ? body.address.trim() : null;
+  const address = typeof body?.address === "string" ? body.address.trim() || null : undefined;
   if (address !== null && address.length > 500) {
     return c.json({ success: false, message: "آدرس شعبه نباید بیشتر از ۵۰۰ کاراکتر باشد." }, 400);
   }

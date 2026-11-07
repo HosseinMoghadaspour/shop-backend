@@ -172,47 +172,16 @@ function mapProductStockInfo(row: ProductStockViewRow): ProductStockInfo {
   };
 }
 
-async function findProductsStockInfo(productIds: number[], branchId?: number): Promise<Map<number, ProductStockInfo[]>> {
+async function findProductsStockInfo(productIds: number[]): Promise<Map<number, ProductStockInfo[]>> {
   const stockInfoByProductId = new Map<number, ProductStockInfo[]>();
   if (productIds.length === 0) return stockInfoByProductId;
 
-  let warehouseId: number | null = null;
-
-  if (branchId !== undefined) {
-    const config = await prisma.$queryRaw<Array<{ Warehouse_ID: number }>>(Prisma.sql`
-      SELECT config.Warehouse_ID
-      FROM dbo.SiteBranchConfig config
-      INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID AND branch.IsActive = 1
-      INNER JOIN dbo.Warehouse warehouse
-        ON warehouse.RowID = config.Warehouse_ID
-        AND warehouse.Branch_ID = config.Branch_ID
-        AND warehouse.IsActive = 1
-      WHERE config.Branch_ID = ${branchId} AND config.IsActive = 1
-    `);
-    warehouseId = config[0]?.Warehouse_ID ?? null;
-  } else {
-    const defaultConfig = await prisma.$queryRaw<Array<{ Warehouse_ID: number }>>(Prisma.sql`
-      SELECT TOP 1 config.Warehouse_ID
-      FROM dbo.SiteBranchConfig config
-      INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID
-      INNER JOIN dbo.Warehouse warehouse
-        ON warehouse.RowID = config.Warehouse_ID
-        AND warehouse.Branch_ID = config.Branch_ID
-        AND warehouse.IsActive = 1
-      WHERE config.IsActive = 1
-        AND config.IsDefault = 1
-        AND branch.IsActive = 1
-      ORDER BY config.Branch_ID
-    `);
-    if (defaultConfig[0]) {
-      warehouseId = Number(defaultConfig[0].Warehouse_ID);
-    } else {
-      const appSettings = await prisma.appSettings.findFirst({
-        select: { SiteWareHouseID: true },
-      });
-      warehouseId = appSettings?.SiteWareHouseID ?? null;
-    }
-  }
+  // Stock is read from the store-wide accounting warehouse, not from the
+  // selected branch. Branches no longer own or select warehouses.
+  const appSettings = await prisma.appSettings.findFirst({
+    select: { SiteWareHouseID: true },
+  });
+  const warehouseId = appSettings?.SiteWareHouseID ?? null;
 
   if (warehouseId == null) return stockInfoByProductId;
 
@@ -268,8 +237,8 @@ async function findProductsStockInfo(productIds: number[], branchId?: number): P
   return stockInfoByProductId;
 }
 
-async function findProductStockInfo(productId: number, branchId?: number): Promise<ProductStockInfo[]> {
-  const stockInfoByProductId = await findProductsStockInfo([productId], branchId);
+async function findProductStockInfo(productId: number): Promise<ProductStockInfo[]> {
+  const stockInfoByProductId = await findProductsStockInfo([productId]);
   return stockInfoByProductId.get(productId) ?? [];
 }
 
@@ -349,7 +318,7 @@ export async function findProducts(filters: ProductFilters) {
   const productIds = result.items.map((item) => item.RowID);
 
   const [stockInfoByProductId, ...imagesByProduct] = await Promise.all([
-    findProductsStockInfo(productIds, filters.branchId),
+    findProductsStockInfo(productIds),
     ...productIds.map((id) => findProductImages(id)),
   ]);
 
@@ -378,7 +347,7 @@ export async function findProductById(
   const [images, pricing, stockInfo] = await Promise.all([
     findProductImages(id),
     resolveProductPricing(product, options),
-    findProductStockInfo(id, options.branchId),
+    findProductStockInfo(id),
   ]);
 
   return { ...mapProduct(product), pricing, images, stockInfo };
@@ -397,7 +366,7 @@ export async function findProductByCode(
   const [images, pricing, stockInfo] = await Promise.all([
     findProductImages(product.RowID),
     resolveProductPricing(product, options),
-    findProductStockInfo(product.RowID, options.branchId),
+    findProductStockInfo(product.RowID),
   ]);
 
   return { ...mapProduct(product), pricing, images, stockInfo };

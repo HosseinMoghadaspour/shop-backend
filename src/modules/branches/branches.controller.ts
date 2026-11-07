@@ -38,6 +38,10 @@ export async function putAdminBranch(c: Context) {
   const salePriceTypeId = body?.salePriceTypeId == null ? null : Number(body.salePriceTypeId);
   const latitude = body?.latitude == null || body.latitude === "" ? null : Number(body.latitude);
   const longitude = body?.longitude == null || body.longitude === "" ? null : Number(body.longitude);
+  const address = typeof body?.address === "string" ? body.address.trim() : null;
+  if (address !== null && address.length > 500) {
+    return c.json({ success: false, message: "آدرس شعبه نباید بیشتر از ۵۰۰ کاراکتر باشد." }, 400);
+  }
   if (!Number.isSafeInteger(cityId) || cityId <= 0 ||
       !Number.isSafeInteger(warehouseId) || warehouseId <= 0 ||
       (salePriceTypeId !== null && (!Number.isSafeInteger(salePriceTypeId) || salePriceTypeId <= 0)) ||
@@ -48,7 +52,7 @@ export async function putAdminBranch(c: Context) {
   }
   try {
     await saveSiteBranchConfig({ branchId, cityId, warehouseId, salePriceTypeId, latitude, longitude,
-      isActive: body.isActive, isDefault: body.isDefault });
+      isActive: body.isActive, isDefault: body.isDefault, address });
     return c.json({ success: true, message: "تنظیمات شعبه ذخیره شد." });
   } catch (error) {
     return c.json({ success: false, message: error instanceof Error ? error.message : "ذخیره تنظیمات شعبه ناموفق بود." }, 400);

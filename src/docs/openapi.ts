@@ -17,6 +17,7 @@ type RouteDoc = {
 };
 
 const routes: RouteDoc[] = [
+  { method: "get", path: "/health", tag: "سیستم", summary: "بررسی سلامت سرور" },
   // Authentication
   { method: "post", path: "/api/auth/customer/request-otp", tag: "احراز هویت", summary: "درخواست کد ورود مشتری", body: "json" },
   { method: "post", path: "/api/auth/customer/verify-otp", tag: "احراز هویت", summary: "تأیید کد ورود مشتری و ایجاد نشست", body: "json" },

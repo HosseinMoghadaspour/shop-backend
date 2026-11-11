@@ -3,6 +3,8 @@ import { routes } from "./routes/index.js";
 import { errorHandler } from "./shared/errors/error-handler.js";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { swaggerUI } from "@hono/swagger-ui";
+import { openApiDocument } from "./docs/openapi.js";
 
 export const app = new Hono();
 
@@ -19,6 +21,17 @@ app.get("/health", async (c) => {
     message: "OK"
   });
 });
+
+app.get("/openapi.json", (c) => c.json(openApiDocument));
+
+app.get(
+  "/api-docs",
+  swaggerUI({
+    url: "/openapi.json",
+    docExpansion: "list",
+    persistAuthorization: true,
+  }),
+);
 
 app.onError(errorHandler);
 

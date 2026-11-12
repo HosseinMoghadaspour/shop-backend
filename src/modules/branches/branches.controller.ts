@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import {
   getAdminBranchOptions,
+  listActiveWarehouses,
   listAllSiteBranchConfigs,
   listSiteBranches,
   saveSiteBranchConfig,
@@ -70,6 +71,10 @@ export async function putAdminBranch(c: Context) {
     body?.longitude == null || body.longitude === ""
       ? null
       : Number(body.longitude);
+  const warehouseId =
+    body?.warehouseId == null || body.warehouseId === ""
+      ? null
+      : Number(body.warehouseId);
   const address =
     typeof body?.address === "string"
       ? body.address.trim() || null
@@ -87,6 +92,8 @@ export async function putAdminBranch(c: Context) {
     cityId <= 0 ||
     (salePriceTypeId !== null &&
       (!Number.isSafeInteger(salePriceTypeId) || salePriceTypeId <= 0)) ||
+    (warehouseId !== null &&
+      (!Number.isSafeInteger(warehouseId) || warehouseId <= 0)) ||
     (latitude !== null && !Number.isFinite(latitude)) ||
     (longitude !== null && !Number.isFinite(longitude)) ||
     typeof body?.isActive !== "boolean" ||
@@ -103,6 +110,7 @@ export async function putAdminBranch(c: Context) {
       branchId,
       cityId,
       salePriceTypeId,
+      warehouseId,
       latitude,
       longitude,
       isActive: body.isActive,
@@ -129,4 +137,9 @@ export async function putAdminBranch(c: Context) {
 
 export async function getAdminBranchSetupOptions(c: Context) {
   return c.json({ success: true, data: await getAdminBranchOptions() });
+}
+
+
+export async function getAdminWarehouses(c: Context) {
+  return c.json({ success: true, data: await listActiveWarehouses() });
 }

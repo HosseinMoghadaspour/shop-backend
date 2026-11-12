@@ -156,7 +156,7 @@ export async function updateAdminProductVisibility(
   isVisible: boolean,
   branchId: number,
 ) {
-  const existing = await prisma.good.findUnique({
+  const existing = await prisma.good.findFirst({
     where: { RowID: productId, Branch_ID: branchId },
     select: { RowID: true },
   });

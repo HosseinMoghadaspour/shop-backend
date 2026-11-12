@@ -142,5 +142,13 @@ export async function getAdminBranchSetupOptions(c: Context) {
 
 
 export async function getAdminWarehouses(c: Context) {
-  return c.json({ success: true, data: await listActiveWarehouses() });
+  const branchId = Number(c.req.query("branchId"));
+  if (!Number.isSafeInteger(branchId) || branchId <= 0) {
+    return c.json({ success: false, message: "شناسه شعبه معتبر نیست." }, 400);
+  }
+
+  return c.json({
+    success: true,
+    data: await listActiveWarehouses(branchId),
+  });
 }

@@ -207,15 +207,16 @@ export async function saveSiteBranchConfig(input: {
   }
 
   const validWarehouse = await prisma.$queryRaw<Array<{ RowID: number }>>(
-      Prisma.sql`
-        SELECT RowID
-        FROM dbo.Warehouse
-        WHERE RowID = ${input.warehouseId}
-          AND IsActive = 1
-      `,
+    Prisma.sql`
+      SELECT RowID
+      FROM dbo.Warehouse
+      WHERE RowID = ${input.warehouseId}
+        AND Branch_ID = ${input.branchId}
+        AND IsActive = 1
+    `,
   );
   if (!validWarehouse.length) {
-    throw new Error("انبار انتخاب‌شده وجود ندارد یا غیرفعال است.");
+    throw new Error("انبار انتخاب‌شده فعال نیست یا به این شعبه تعلق ندارد.");
   }
 
   if (input.salePriceTypeId !== null) {
@@ -340,7 +341,7 @@ export async function getAdminBranchOptions() {
 }
 
 
-export async function listActiveWarehouses() {
+export async function listActiveWarehouses(branchId: number) {
   const rows = await prisma.$queryRaw<Array<{
     id: number;
     name: string;
@@ -348,6 +349,7 @@ export async function listActiveWarehouses() {
     SELECT RowID AS id, RowName AS name
     FROM dbo.Warehouse
     WHERE IsActive = 1
+      AND Branch_ID = ${branchId}
     ORDER BY RowName
   `);
   return rows.map((row) => ({ id: Number(row.id), name: row.name }));

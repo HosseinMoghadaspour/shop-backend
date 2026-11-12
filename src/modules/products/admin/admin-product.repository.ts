@@ -13,11 +13,13 @@ export interface AdminProductFilters {
 export async function findAdminProducts(filters: AdminProductFilters) {
   const branchConfigs = await prisma.$queryRaw<Array<{
     Branch_ID: number;
+    BranchName: string;
     Warehouse_ID: number;
     WarehouseName: string;
   }>>(Prisma.sql`
     SELECT
       branch.RowID AS Branch_ID,
+      branch.RowName AS BranchName,
       config.Warehouse_ID,
       warehouse.RowName AS WarehouseName
     FROM dbo.Branch branch
@@ -119,6 +121,7 @@ export async function findAdminProducts(filters: AdminProductFilters) {
   return {
     branch: {
       id: Number(branchConfig.Branch_ID),
+      name: branchConfig.BranchName,
       warehouseId: Number(branchConfig.Warehouse_ID),
       warehouseName: branchConfig.WarehouseName,
     },

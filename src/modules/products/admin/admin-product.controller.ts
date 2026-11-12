@@ -31,7 +31,7 @@ export async function listAdminProducts(c: Context) {
     );
   }
 
-  let result;
+  let result: Awaited<ReturnType<typeof findAdminProducts>>;
   try {
     result = await findAdminProducts(parsed.data);
   } catch (error) {

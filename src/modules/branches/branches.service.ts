@@ -127,14 +127,15 @@ export async function listAllSiteBranchConfigs() {
       config.Longitude,
       config.IsDefault,
       config.IsActive,
-      CASE WHEN warehouse.IsActive = 1 THEN config.Warehouse_ID ELSE NULL END AS Warehouse_ID,
-      CASE WHEN warehouse.IsActive = 1 THEN warehouse.RowName ELSE NULL END AS WarehouseName,
+      CASE WHEN warehouse.IsActive = 1 AND warehouse.Branch_ID = branch.RowID THEN config.Warehouse_ID ELSE NULL END AS Warehouse_ID,
+      CASE WHEN warehouse.IsActive = 1 AND warehouse.Branch_ID = branch.RowID THEN warehouse.RowName ELSE NULL END AS WarehouseName,
       CAST(CASE WHEN config.Branch_ID IS NULL THEN 0 ELSE 1 END AS BIT) AS IsConfigured
     FROM dbo.Branch branch
     LEFT JOIN dbo.SiteBranchConfig config
       ON config.Branch_ID = branch.RowID
     LEFT JOIN dbo.Warehouse warehouse
       ON warehouse.RowID = config.Warehouse_ID
+      AND warehouse.Branch_ID = branch.RowID
     LEFT JOIN dbo.City city
       ON city.RowID = config.City_ID
     WHERE branch.IsActive = 1
@@ -307,8 +308,8 @@ export async function getAdminBranchOptions() {
       city.RowName AS cityName,
       county.Province_ID AS provinceId,
       config.SalePriceType_ID AS salePriceTypeId,
-      CASE WHEN warehouse.IsActive = 1 THEN config.Warehouse_ID ELSE NULL END AS warehouseId,
-      CASE WHEN warehouse.IsActive = 1 THEN warehouse.RowName ELSE NULL END AS warehouseName,
+      CASE WHEN warehouse.IsActive = 1 AND warehouse.Branch_ID = branch.RowID THEN config.Warehouse_ID ELSE NULL END AS warehouseId,
+      CASE WHEN warehouse.IsActive = 1 AND warehouse.Branch_ID = branch.RowID THEN warehouse.RowName ELSE NULL END AS warehouseName,
       config.Latitude AS latitude,
       config.Longitude AS longitude,
       config.IsActive AS isActive,
@@ -320,6 +321,7 @@ export async function getAdminBranchOptions() {
       ON city.RowID = config.City_ID
     LEFT JOIN dbo.Warehouse warehouse
       ON warehouse.RowID = config.Warehouse_ID
+      AND warehouse.Branch_ID = branch.RowID
     LEFT JOIN dbo.County county
       ON county.RowID = city.County_ID
     WHERE branch.IsActive = 1

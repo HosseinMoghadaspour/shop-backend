@@ -127,8 +127,8 @@ export async function listAllSiteBranchConfigs() {
       config.Longitude,
       config.IsDefault,
       config.IsActive,
-      config.Warehouse_ID,
-      warehouse.RowName AS WarehouseName,
+      CASE WHEN warehouse.IsActive = 1 THEN config.Warehouse_ID ELSE NULL END AS Warehouse_ID,
+      CASE WHEN warehouse.IsActive = 1 THEN warehouse.RowName ELSE NULL END AS WarehouseName,
       CAST(CASE WHEN config.Branch_ID IS NULL THEN 0 ELSE 1 END AS BIT) AS IsConfigured
     FROM dbo.Branch branch
     LEFT JOIN dbo.SiteBranchConfig config
@@ -306,8 +306,8 @@ export async function getAdminBranchOptions() {
       city.RowName AS cityName,
       county.Province_ID AS provinceId,
       config.SalePriceType_ID AS salePriceTypeId,
-      config.Warehouse_ID AS warehouseId,
-      warehouse.RowName AS warehouseName,
+      CASE WHEN warehouse.IsActive = 1 THEN config.Warehouse_ID ELSE NULL END AS warehouseId,
+      CASE WHEN warehouse.IsActive = 1 THEN warehouse.RowName ELSE NULL END AS warehouseName,
       config.Latitude AS latitude,
       config.Longitude AS longitude,
       config.IsActive AS isActive,

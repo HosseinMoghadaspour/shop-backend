@@ -92,8 +92,9 @@ export async function putAdminBranch(c: Context) {
     cityId <= 0 ||
     (salePriceTypeId !== null &&
       (!Number.isSafeInteger(salePriceTypeId) || salePriceTypeId <= 0)) ||
-    (warehouseId !== null &&
-      (!Number.isSafeInteger(warehouseId) || warehouseId <= 0)) ||
+    warehouseId === null ||
+    !Number.isSafeInteger(warehouseId) ||
+    warehouseId <= 0 ||
     (latitude !== null && !Number.isFinite(latitude)) ||
     (longitude !== null && !Number.isFinite(longitude)) ||
     typeof body?.isActive !== "boolean" ||

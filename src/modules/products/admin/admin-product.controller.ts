@@ -11,6 +11,7 @@ const listQuerySchema = z.object({
   visibility: z.enum(["all", "visible", "hidden"]).default("all"),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
+  branchId: z.coerce.number().int().positive(),
 });
 
 const visibilitySchema = z.object({
@@ -30,9 +31,24 @@ export async function listAdminProducts(c: Context) {
     );
   }
 
-  const result = await findAdminProducts(parsed.data);
+  let result;
+  try {
+    result = await findAdminProducts(parsed.data);
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "دریافت کالاهای شعبه ناموفق بود.",
+      },
+      400,
+    );
+  }
 
   return c.json({
+    branch: result.branch,
     success: true,
     data: result.items,
     pagination: result.pagination,
@@ -78,9 +94,18 @@ export async function changeProductVisibility(c: Context) {
     );
   }
 
+  const branchId = Number(c.req.query("branchId"));
+  if (!Number.isSafeInteger(branchId) || branchId <= 0) {
+    return c.json(
+      { success: false, message: "ابتدا شعبه را انتخاب کنید." },
+      400,
+    );
+  }
+
   const product = await updateAdminProductVisibility(
     id,
     parsed.data.isVisible,
+    branchId,
   );
 
   if (!product) {

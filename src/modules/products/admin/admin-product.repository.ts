@@ -7,10 +7,41 @@ export interface AdminProductFilters {
   visibility: "all" | "visible" | "hidden";
   page: number;
   limit: number;
+  branchId: number;
 }
 
 export async function findAdminProducts(filters: AdminProductFilters) {
+  const branchConfigs = await prisma.$queryRaw<Array<{
+    Branch_ID: number;
+    BranchName: string;
+    Warehouse_ID: number;
+    WarehouseName: string;
+  }>>(Prisma.sql`
+    SELECT
+      branch.RowID AS Branch_ID,
+      branch.RowName AS BranchName,
+      config.Warehouse_ID,
+      warehouse.RowName AS WarehouseName
+    FROM dbo.Branch branch
+    INNER JOIN dbo.SiteBranchConfig config
+      ON config.Branch_ID = branch.RowID
+    INNER JOIN dbo.Warehouse warehouse
+      ON warehouse.RowID = config.Warehouse_ID
+      AND warehouse.Branch_ID = branch.RowID
+      AND warehouse.IsActive = 1
+    WHERE branch.RowID = ${filters.branchId}
+      AND branch.IsActive = 1
+      AND config.IsActive = 1
+      AND config.Warehouse_ID IS NOT NULL
+  `);
+
+  const branchConfig = branchConfigs[0];
+  if (!branchConfig) {
+    throw new Error("شعبه انتخاب‌شده فعال نیست یا انبار فعالی برای آن تعیین نشده است.");
+  }
+
   const where: Prisma.GoodWhereInput = {
+    Branch_ID: filters.branchId,
     ...(filters.visibility === "visible"
       ? { IsShowInOnlineShop: true }
       : filters.visibility === "hidden"
@@ -89,6 +120,12 @@ export async function findAdminProducts(filters: AdminProductFilters) {
   }
 
   return {
+    branch: {
+      id: Number(branchConfig.Branch_ID),
+      name: branchConfig.BranchName,
+      warehouseId: Number(branchConfig.Warehouse_ID),
+      warehouseName: branchConfig.WarehouseName,
+    },
     items: products.map((product) => ({
       id: product.RowID,
       code: product.RowCode,
@@ -121,9 +158,10 @@ export async function findAdminProducts(filters: AdminProductFilters) {
 export async function updateAdminProductVisibility(
   productId: number,
   isVisible: boolean,
+  branchId: number,
 ) {
-  const existing = await prisma.good.findUnique({
-    where: { RowID: productId },
+  const existing = await prisma.good.findFirst({
+    where: { RowID: productId, Branch_ID: branchId },
     select: { RowID: true },
   });
 

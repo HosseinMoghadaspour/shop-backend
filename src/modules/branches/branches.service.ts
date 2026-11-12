@@ -109,6 +109,9 @@ export async function listAllSiteBranchConfigs() {
     Latitude: number | null;
     Longitude: number | null;
     IsDefault: boolean | null;
+    IsActive: boolean | null;
+    Warehouse_ID: number | null;
+    WarehouseName: string | null;
     IsConfigured: boolean;
   }>>(Prisma.sql`
     SELECT
@@ -123,10 +126,16 @@ export async function listAllSiteBranchConfigs() {
       config.Latitude,
       config.Longitude,
       config.IsDefault,
+      config.IsActive,
+      CASE WHEN warehouse.IsActive = 1 AND warehouse.Branch_ID = branch.RowID THEN config.Warehouse_ID ELSE NULL END AS Warehouse_ID,
+      CASE WHEN warehouse.IsActive = 1 AND warehouse.Branch_ID = branch.RowID THEN warehouse.RowName ELSE NULL END AS WarehouseName,
       CAST(CASE WHEN config.Branch_ID IS NULL THEN 0 ELSE 1 END AS BIT) AS IsConfigured
     FROM dbo.Branch branch
     LEFT JOIN dbo.SiteBranchConfig config
       ON config.Branch_ID = branch.RowID
+    LEFT JOIN dbo.Warehouse warehouse
+      ON warehouse.RowID = config.Warehouse_ID
+      AND warehouse.Branch_ID = branch.RowID
     LEFT JOIN dbo.City city
       ON city.RowID = config.City_ID
     WHERE branch.IsActive = 1
@@ -148,6 +157,9 @@ export async function listAllSiteBranchConfigs() {
     latitude: row.Latitude == null ? null : Number(row.Latitude),
     longitude: row.Longitude == null ? null : Number(row.Longitude),
     isDefault: Boolean(row.IsDefault),
+    isActive: row.IsActive == null ? false : Boolean(row.IsActive),
+    warehouseId: row.Warehouse_ID == null ? null : Number(row.Warehouse_ID),
+    warehouseName: row.WarehouseName,
     isConfigured: Boolean(row.IsConfigured),
   }));
 }
@@ -160,6 +172,7 @@ export async function saveSiteBranchConfig(input: {
   longitude: number | null;
   isActive: boolean;
   isDefault: boolean;
+  warehouseId: number;
   address?: string | null;
 }) {
   if ((input.latitude === null) !== (input.longitude === null)) {
@@ -194,9 +207,19 @@ export async function saveSiteBranchConfig(input: {
     throw new Error("شعبه یا شهر انتخاب‌شده معتبر نیست.");
   }
 
-  // Branch configuration is independent from warehouses. The legacy
-  // Warehouse_ID column is kept nullable for backward compatibility only.
-  
+  const validWarehouse = await prisma.$queryRaw<Array<{ RowID: number }>>(
+    Prisma.sql`
+      SELECT RowID
+      FROM dbo.Warehouse
+      WHERE RowID = ${input.warehouseId}
+        AND Branch_ID = ${input.branchId}
+        AND IsActive = 1
+    `,
+  );
+  if (!validWarehouse.length) {
+    throw new Error("انبار انتخاب‌شده فعال نیست یا به این شعبه تعلق ندارد.");
+  }
+
   if (input.salePriceTypeId !== null) {
     const validPriceType = await prisma.$queryRaw<Array<{ RowID: bigint }>>(
       Prisma.sql`
@@ -243,7 +266,7 @@ export async function saveSiteBranchConfig(input: {
         UPDATE dbo.SiteBranchConfig
         SET
           City_ID = ${input.cityId},
-          Warehouse_ID = NULL,
+          Warehouse_ID = ${input.warehouseId},
           SalePriceType_ID = ${input.salePriceTypeId},
           Latitude = ${input.latitude},
           Longitude = ${input.longitude},
@@ -255,7 +278,7 @@ export async function saveSiteBranchConfig(input: {
         INSERT INTO dbo.SiteBranchConfig
           (Branch_ID, City_ID, Warehouse_ID, SalePriceType_ID, Latitude, Longitude, IsActive, IsDefault)
         VALUES
-          (${input.branchId}, ${input.cityId}, NULL, ${input.salePriceTypeId},
+          (${input.branchId}, ${input.cityId}, ${input.warehouseId}, ${input.salePriceTypeId},
            ${input.latitude}, ${input.longitude}, ${input.isActive}, ${isDefault})
     `);
   });
@@ -274,6 +297,8 @@ export async function getAdminBranchOptions() {
     longitude: number | null;
     isActive: boolean | null;
     isDefault: boolean | null;
+    warehouseId: number | null;
+    warehouseName: string | null;
   }>>(Prisma.sql`
     SELECT
       branch.RowID AS branchId,
@@ -283,6 +308,8 @@ export async function getAdminBranchOptions() {
       city.RowName AS cityName,
       county.Province_ID AS provinceId,
       config.SalePriceType_ID AS salePriceTypeId,
+      CASE WHEN warehouse.IsActive = 1 AND warehouse.Branch_ID = branch.RowID THEN config.Warehouse_ID ELSE NULL END AS warehouseId,
+      CASE WHEN warehouse.IsActive = 1 AND warehouse.Branch_ID = branch.RowID THEN warehouse.RowName ELSE NULL END AS warehouseName,
       config.Latitude AS latitude,
       config.Longitude AS longitude,
       config.IsActive AS isActive,
@@ -292,6 +319,9 @@ export async function getAdminBranchOptions() {
       ON config.Branch_ID = branch.RowID
     LEFT JOIN dbo.City city
       ON city.RowID = config.City_ID
+    LEFT JOIN dbo.Warehouse warehouse
+      ON warehouse.RowID = config.Warehouse_ID
+      AND warehouse.Branch_ID = branch.RowID
     LEFT JOIN dbo.County county
       ON county.RowID = city.County_ID
     WHERE branch.IsActive = 1
@@ -305,7 +335,24 @@ export async function getAdminBranchOptions() {
     provinceId: row.provinceId == null ? null : Number(row.provinceId),
     salePriceTypeId:
       row.salePriceTypeId == null ? null : Number(row.salePriceTypeId),
+    warehouseId: row.warehouseId == null ? null : Number(row.warehouseId),
+    warehouseName: row.warehouseName,
     latitude: row.latitude == null ? null : Number(row.latitude),
     longitude: row.longitude == null ? null : Number(row.longitude),
   }));
+}
+
+
+export async function listActiveWarehouses(branchId: number) {
+  const rows = await prisma.$queryRaw<Array<{
+    id: number;
+    name: string;
+  }>>(Prisma.sql`
+    SELECT RowID AS id, RowName AS name
+    FROM dbo.Warehouse
+    WHERE IsActive = 1
+      AND Branch_ID = ${branchId}
+    ORDER BY RowName
+  `);
+  return rows.map((row) => ({ id: Number(row.id), name: row.name }));
 }

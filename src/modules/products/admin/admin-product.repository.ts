@@ -27,6 +27,7 @@ export async function findAdminProducts(filters: AdminProductFilters) {
       ON config.Branch_ID = branch.RowID
     INNER JOIN dbo.Warehouse warehouse
       ON warehouse.RowID = config.Warehouse_ID
+      AND warehouse.Branch_ID = branch.RowID
       AND warehouse.IsActive = 1
     WHERE branch.RowID = ${filters.branchId}
       AND branch.IsActive = 1

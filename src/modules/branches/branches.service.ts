@@ -206,22 +206,16 @@ export async function saveSiteBranchConfig(input: {
     throw new Error("شعبه یا شهر انتخاب‌شده معتبر نیست.");
   }
 
-  if (input.warehouseId === null) {
-    throw new Error("برای هر شعبه باید یک انبار فعال انتخاب کنید.");
-  }
-
-  {
-    const validWarehouse = await prisma.$queryRaw<Array<{ RowID: number }>>(
+  const validWarehouse = await prisma.$queryRaw<Array<{ RowID: number }>>(
       Prisma.sql`
         SELECT RowID
         FROM dbo.Warehouse
         WHERE RowID = ${input.warehouseId}
           AND IsActive = 1
       `,
-    );
-    if (!validWarehouse.length) {
-      throw new Error("انبار انتخاب‌شده وجود ندارد یا غیرفعال است.");
-    }
+  );
+  if (!validWarehouse.length) {
+    throw new Error("انبار انتخاب‌شده وجود ندارد یا غیرفعال است.");
   }
 
   if (input.salePriceTypeId !== null) {

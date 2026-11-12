@@ -171,7 +171,7 @@ export async function saveSiteBranchConfig(input: {
   longitude: number | null;
   isActive: boolean;
   isDefault: boolean;
-  warehouseId: number | null;
+  warehouseId: number;
   address?: string | null;
 }) {
   if ((input.latitude === null) !== (input.longitude === null)) {
@@ -206,11 +206,11 @@ export async function saveSiteBranchConfig(input: {
     throw new Error("شعبه یا شهر انتخاب‌شده معتبر نیست.");
   }
 
-  if (input.isActive && input.warehouseId === null) {
-    throw new Error("برای فعال‌سازی شعبه، یک انبار فعال انتخاب کنید.");
+  if (input.warehouseId === null) {
+    throw new Error("برای هر شعبه باید یک انبار فعال انتخاب کنید.");
   }
 
-  if (input.warehouseId !== null) {
+  {
     const validWarehouse = await prisma.$queryRaw<Array<{ RowID: number }>>(
       Prisma.sql`
         SELECT RowID

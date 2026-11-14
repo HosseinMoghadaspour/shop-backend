@@ -30,10 +30,10 @@ async function removeManagedFooterFile(url: string | null) {
   const filename = url.slice(prefix.length);
   if (path.basename(filename) !== filename) return;
 
-  const match = filename.match(/^([\\w-]+)-(thumbnail|medium|large)\\.webp$/);
+  const match = filename.match(/^([\w-]+)-(thumbnail|medium|large)\.webp$/);
   const filenames = match
     ? ["thumbnail", "medium", "large"].map((size) => `${match[1]}-${size}.webp`)
-    : /^[\\w-]+\\.webp$/.test(filename)
+    : /^[\w-]+\.webp$/.test(filename)
       ? [filename]
       : [];
 

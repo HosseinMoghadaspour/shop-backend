@@ -44,8 +44,10 @@ export async function uploadProductImages(
 
     // پردازش ترتیبی برای کنترل مصرف CPU و حافظه
     for (const file of files) {
-      if (file.size <= 0) {
-        throw new ProductImageError("فایل تصویر خالی است.");
+      if (file.size <= 0 || file.size > 8 * 1024 * 1024) {
+        throw new ProductImageError(
+          "حجم هر تصویر باید بیشتر از صفر و حداکثر ۸ مگابایت باشد.",
+        );
       }
 
       const input = Buffer.from(await file.arrayBuffer());

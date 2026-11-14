@@ -1,13 +1,3 @@
-import {
-  findBranchPrice,
-  findBranchPrices,
-  findBranchSalePriceType,
-  findMainBranch,
-  findSalePrice,
-  findSalePrices,
-  type BranchPriceRecord,
-  type SalePriceRecord,
-} from "./price.repository.js";
 import type { ProductPricing } from "./price.types.js";
 
 function normalizeDiscount(salePrice: number, discountPrice: number | null) {
@@ -19,44 +9,27 @@ function normalizeDiscount(salePrice: number, discountPrice: number | null) {
   ) {
     return null;
   }
-
   return discountPrice;
 }
 
-function buildPricing(
-  base:{
+/**
+ * Storefront catalog pricing is global. Branch selection affects availability
+ * only; branch-specific ERP price rows are intentionally not applied here.
+ */
+function buildGlobalPricing(base: {
   RowID: number;
   SalePrice: number;
   DiscountPrice: number | null;
   ConsumerPrice: number | null;
-},
-  branch: BranchPriceRecord | null,
-  saleType: SalePriceRecord | null,
-): ProductPricing {
-  let salePrice = base.SalePrice;
-  let consumerPrice = base.ConsumerPrice;
-
-  if (branch?.salePrice != null && branch.salePrice > 0) {
-    salePrice = branch.salePrice;
-  }
-  if (branch?.consumerPrice != null) {
-    consumerPrice = branch.consumerPrice;
-  }
-
-  // Explicit price type has higher priority than the branch price.
-  if (saleType?.salePrice != null && saleType.salePrice > 0) {
-    salePrice = saleType.salePrice;
-  }
-  if (saleType?.consumerPrice != null) {
-    consumerPrice = saleType.consumerPrice;
-  }
-
-  const discountPrice = normalizeDiscount(salePrice, base.DiscountPrice);
+}): ProductPricing {
+  const salePrice = Number(base.SalePrice ?? 0);
+  const consumerPrice = Number(base.ConsumerPrice ?? 0);
+  const discountPrice = normalizeDiscount(
+    salePrice,
+    base.DiscountPrice == null ? null : Number(base.DiscountPrice),
+  );
   const finalPrice = discountPrice ?? salePrice;
-  const hasDiscount = discountPrice != null;
-  const discountPercent = hasDiscount
-    ? Number((((salePrice - finalPrice) / salePrice) * 100).toFixed(2))
-    : null;
+  const hasDiscount = discountPrice !== null;
 
   return {
     salePrice,
@@ -64,41 +37,21 @@ function buildPricing(
     discountPrice,
     finalPrice,
     hasDiscount,
-    discountPercent,
-    branchId: branch?.branchId ?? saleType?.branchId ?? null,
-    priceType: saleType
-      ? {
-          id: saleType.salePriceTypeId,
-          name: saleType.salePriceTypeName,
-          salePrice: saleType.salePrice,
-          consumerPrice: saleType.consumerPrice,
-        }
+    discountPercent: hasDiscount
+      ? Number((((salePrice - finalPrice) / salePrice) * 100).toFixed(2))
       : null,
+    branchId: null,
+    priceType: null,
   };
 }
 
-export async function resolveProductPricing(
-  product: {
-    RowID: number;
-    SalePrice: number;
-    DiscountPrice: number | null;
-    ConsumerPrice: number | null;
-  },
-  options: { branchId?: number; salePriceTypeId?: number } = {},
-): Promise<ProductPricing> {
-  const branchId = options.branchId ?? (await findMainBranch())?.id;
-  const configuredPriceTypeId = branchId == null ? null : await findBranchSalePriceType(branchId);
-  const salePriceTypeId = options.branchId !== undefined
-    ? configuredPriceTypeId ?? undefined
-    : options.salePriceTypeId ?? configuredPriceTypeId ?? undefined;
-  const [branch, saleType] = await Promise.all([
-    branchId == null ? Promise.resolve(null) : findBranchPrice(product.RowID, branchId),
-    salePriceTypeId == null
-      ? Promise.resolve(null)
-      : findSalePrice(product.RowID, salePriceTypeId),
-  ]);
-
-  return buildPricing(product, branch, saleType);
+export async function resolveProductPricing(product: {
+  RowID: number;
+  SalePrice: number;
+  DiscountPrice: number | null;
+  ConsumerPrice: number | null;
+}): Promise<ProductPricing> {
+  return buildGlobalPricing(product);
 }
 
 export async function resolveProductsPricing(
@@ -108,34 +61,9 @@ export async function resolveProductsPricing(
     DiscountPrice: number | null;
     ConsumerPrice: number | null;
   }>,
-  options: { branchId?: number; salePriceTypeId?: number } = {},
 ): Promise<Map<number, ProductPricing>> {
-  const result = new Map<number, ProductPricing>();
-  if (products.length === 0) return result;
-
-  const branchId = options.branchId ?? (await findMainBranch())?.id;
-  const configuredPriceTypeId = branchId == null ? null : await findBranchSalePriceType(branchId);
-  const salePriceTypeId = options.branchId !== undefined
-    ? configuredPriceTypeId ?? undefined
-    : options.salePriceTypeId ?? configuredPriceTypeId ?? undefined;
-  const [branches, saleTypes] = await Promise.all([
-    branchId == null
-      ? Promise.resolve<BranchPriceRecord[]>([])
-      : findBranchPrices(products.map((p) => p.RowID), branchId),
-    salePriceTypeId == null
-      ? Promise.resolve<SalePriceRecord[]>([])
-      : findSalePrices(products.map((p) => p.RowID), salePriceTypeId),
-  ]);
-
-  const branchMap = new Map(branches.map((item) => [item.goodId, item]));
-  const saleTypeMap = new Map(saleTypes.map((item) => [item.goodId, item]));
-
-  for (const product of products) {
-    result.set(
-      product.RowID,
-      buildPricing(product, branchMap.get(product.RowID) ?? null, saleTypeMap.get(product.RowID) ?? null),
-    );
-  }
-
-  return result;
+  return new Map(products.map((product) => [
+    product.RowID,
+    buildGlobalPricing(product),
+  ]));
 }

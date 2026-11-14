@@ -105,7 +105,7 @@ export async function uploadAdminSliderImage(id: bigint, file: File) {
   }
 
   const input = Buffer.from(await file.arrayBuffer());
-  let processed;
+  let processed: Awaited<ReturnType<typeof processImage>>;
   try {
     processed = await processImage(input, {
       outputDir: uploadDir,

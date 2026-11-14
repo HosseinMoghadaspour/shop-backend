@@ -1,20 +1,10 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, unlink } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import path from "node:path";
-import sharp, { type Metadata } from "sharp";
+import { processImage } from "../../shared/utils/image-processor.js";
 
 import { prisma } from "../../lib/prisma.js";
 
 const uploadDir = path.resolve(process.cwd(), "uploads", "footer");
-
-const maxFileSize = 8 * 1024 * 1024;
-
-const allowedFormats = new Set([
-  "jpeg",
-  "png",
-  "webp",
-  "avif",
-]);
 
 export type FooterImageField =
   | "LogoImageUrl"
@@ -35,19 +25,24 @@ function isFooterImageField(value: string): value is FooterImageField {
 
 async function removeManagedFooterFile(url: string | null) {
   const prefix = "/uploads/footer/";
-
   if (!url?.startsWith(prefix)) return;
 
   const filename = url.slice(prefix.length);
+  if (path.basename(filename) !== filename) return;
 
-  if (
-    path.basename(filename) !== filename ||
-    !/^[\w-]+\.webp$/.test(filename)
-  ) {
-    return;
-  }
+  const match = filename.match(/^([\\w-]+)-(thumbnail|medium|large)\\.webp$/);
+  const filenames = match
+    ? ["thumbnail", "medium", "large"].map((size) => `${match[1]}-${size}.webp`)
+    : /^[\\w-]+\\.webp$/.test(filename)
+      ? [filename]
+      : [];
 
-  await unlink(path.resolve(uploadDir, filename)).catch(() => undefined);
+  await Promise.all(
+    filenames.map((managedFilename) =>
+      unlink(path.resolve(uploadDir, managedFilename)).catch(() => undefined),
+    ),
+  );
+}
 }
 
 export async function uploadAdminFooterImage(
@@ -60,28 +55,21 @@ export async function uploadAdminFooterImage(
 
   const field = fieldValue;
 
-  if (file.size <= 0 || file.size > maxFileSize) {
-    throw new AdminFooterImageError(
-      "حجم تصویر باید بیشتر از صفر و حداکثر ۸ مگابایت باشد.",
-    );
+  if (file.size <= 0) {
+    throw new AdminFooterImageError("فایل تصویر خالی است.");
   }
 
   const input = Buffer.from(await file.arrayBuffer());
-
-let metadata: Metadata;
-
+  let processed;
   try {
-    metadata = await sharp(input, {
-      limitInputPixels: 40_000_000,
-      animated: false,
-    }).metadata();
-  } catch {
-    throw new AdminFooterImageError("فایل انتخاب‌شده تصویر معتبر نیست.");
-  }
-
-  if (!metadata.format || !allowedFormats.has(metadata.format)) {
+    processed = await processImage(input, {
+      outputDir: uploadDir,
+      quality: 84,
+      maxInputSize: 8 * 1024 * 1024,
+    });
+  } catch (error) {
     throw new AdminFooterImageError(
-      "فرمت تصویر باید JPEG، PNG، WebP یا AVIF باشد.",
+      error instanceof Error ? error.message : "پردازش تصویر فوتر ناموفق بود.",
     );
   }
 
@@ -89,31 +77,11 @@ let metadata: Metadata;
     orderBy: { RowID: "desc" },
   });
 
-  await mkdir(uploadDir, { recursive: true });
-
-  const filename = `${randomUUID()}.webp`;
-  const absolutePath = path.join(uploadDir, filename);
+  // لوگو و نمادهای فوتر از نسخه medium استفاده می‌کنند.
+  const filename = processed.images.medium.filename;
+  const url = `/uploads/footer/${filename}`;
 
   try {
-    await sharp(input, {
-      limitInputPixels: 40_000_000,
-      animated: false,
-    })
-      .rotate()
-      .resize({
-        width: 1920,
-        height: 1200,
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .webp({
-        quality: 84,
-        effort: 4,
-      })
-      .toFile(absolutePath);
-
-    const url = `/uploads/footer/${filename}`;
-
     const data: Partial<Record<FooterImageField, string | null>> = {
       [field]: url,
     };
@@ -128,7 +96,6 @@ let metadata: Metadata;
         });
 
     const oldUrl = existing?.[field] ?? null;
-
     await removeManagedFooterFile(oldUrl);
 
     return {
@@ -137,7 +104,11 @@ let metadata: Metadata;
       url,
     };
   } catch (error) {
-    await unlink(absolutePath).catch(() => undefined);
+    await Promise.all(
+      Object.values(processed.images).map((image) =>
+        unlink(image.path).catch(() => undefined),
+      ),
+    );
     throw error;
   }
 }

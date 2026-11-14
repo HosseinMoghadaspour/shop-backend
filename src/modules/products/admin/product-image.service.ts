@@ -201,11 +201,11 @@ export async function deleteProductImage(
 
   if (url?.startsWith(prefix) && path.basename(url) === url.slice(prefix.length)) {
     const filename = path.basename(url);
-    const match = filename.match(/^([\\w-]+)-(thumbnail|medium|large)\\.webp$/);
+    const match = filename.match(/^([\w-]+)-(thumbnail|medium|large)\.webp$/);
 
     const filenames = match
       ? ["thumbnail", "medium", "large"].map((size) => `${match[1]}-${size}.webp`)
-      : /^[\\w-]+\\.webp$/.test(filename)
+      : /^[\w-]+\.webp$/.test(filename)
         ? [filename] // سازگاری با تصاویر قدیمی
         : [];
 

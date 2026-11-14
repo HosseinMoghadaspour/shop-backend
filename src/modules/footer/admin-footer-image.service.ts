@@ -43,7 +43,6 @@ async function removeManagedFooterFile(url: string | null) {
     ),
   );
 }
-}
 
 export async function uploadAdminFooterImage(
   fieldValue: string,

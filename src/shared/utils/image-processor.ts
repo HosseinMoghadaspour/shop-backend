@@ -99,6 +99,7 @@ export async function processImage(
         .rotate()
         .resize({
           width,
+          height: width,
           fit: "inside",
           withoutEnlargement: true,
         })

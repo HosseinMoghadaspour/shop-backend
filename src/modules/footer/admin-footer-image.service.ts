@@ -54,8 +54,10 @@ export async function uploadAdminFooterImage(
 
   const field = fieldValue;
 
-  if (file.size <= 0) {
-    throw new AdminFooterImageError("فایل تصویر خالی است.");
+  if (file.size <= 0 || file.size > 8 * 1024 * 1024) {
+    throw new AdminFooterImageError(
+      "حجم تصویر باید بیشتر از صفر و حداکثر ۸ مگابایت باشد.",
+    );
   }
 
   const input = Buffer.from(await file.arrayBuffer());

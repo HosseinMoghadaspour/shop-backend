@@ -100,8 +100,10 @@ export async function uploadAdminSliderImage(id: bigint, file: File) {
     select: { RowID: true, UrlImage: true },
   });
   if (!existing) throw new AdminSliderError("اسلایدر پیدا نشد.");
-  if (file.size <= 0) {
-    throw new AdminSliderError("فایل تصویر خالی است.");
+  if (file.size <= 0 || file.size > 8 * 1024 * 1024) {
+    throw new AdminSliderError(
+      "حجم تصویر باید بیشتر از صفر و حداکثر ۸ مگابایت باشد.",
+    );
   }
 
   const input = Buffer.from(await file.arrayBuffer());

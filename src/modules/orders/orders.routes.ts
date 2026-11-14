@@ -7,7 +7,7 @@ import {
 } from "./orders.controller.js";
 
 import {
-  requireCustomerAuth,
+  requireShopAuth,
 } from "../../middleware/auth.middleware.js";
 
 export const ordersRoutes =
@@ -16,18 +16,18 @@ export const ordersRoutes =
 
 ordersRoutes.post(
   "/",
-  requireCustomerAuth,
+  requireShopAuth,
   orderController,
 );
 
 ordersRoutes.get(
   "/",
-  requireCustomerAuth,
+  requireShopAuth,
   getOrdersController,
 );
 
 ordersRoutes.get(
   "/:id",
-  requireCustomerAuth,
+  requireShopAuth,
   getOrderByIdController,
 );

@@ -2,6 +2,8 @@ import type {
   Context,
   Next,
 } from "hono";
+import { prisma } from "../lib/prisma.js";
+import { create as createPerson } from "../modules/persons/person.repository.js";
 
 import {
   getSession,
@@ -118,7 +120,7 @@ function getSessionToken(
 async function authenticate(
   c: Context,
   next: Next,
-  expectedKind?: AuthKind,
+  expectedKind?: AuthKind | "shop",
 ) {
   try {
     const token =
@@ -181,8 +183,8 @@ async function authenticate(
 
     if (
       expectedKind &&
-      session.kind !==
-        expectedKind
+      expectedKind !== "shop" &&
+      session.kind !== expectedKind
     ) {
       return c.json(
         {
@@ -270,6 +272,62 @@ async function authenticate(
         "admin",
         admin,
       );
+
+      // Admins may also use customer-facing shop features.
+      // Their shopping identity is a Person record, not UserInfo.RowID.
+      if (expectedKind === "shop") {
+        const adminUser = await prisma.userInfo.findFirst({
+          where: {
+            RowID: session.userId,
+            IsActive: true,
+            IsAdmin: true,
+          },
+          select: {
+            RowName: true,
+            Mobile: true,
+          },
+        });
+
+        const mobile = adminUser?.Mobile?.trim();
+        if (!adminUser || !mobile) {
+          return c.json(
+            {
+              success: false,
+              message: "برای استفاده از فروشگاه، شماره موبایل مدیر معتبر نیست.",
+            },
+            403,
+          );
+        }
+
+        let shopPerson = await prisma.person.findFirst({
+          where: {
+            IsActive: true,
+            OR: [
+              { MobileNumber: mobile },
+              { MobileForSMS: mobile },
+            ],
+          },
+          select: { RowID: true },
+        });
+
+        if (!shopPerson) {
+          const mobileForSms = mobile.length <= 11 ? mobile : undefined;
+          shopPerson = await createPerson({
+            RowName: adminUser.RowName,
+            MobileNumber: mobile,
+            ...(mobileForSms ? { MobileForSMS: mobileForSms } : {}),
+            IsRegisteredOnline: true,
+          });
+        }
+
+        const shopCustomer: CustomerAuth = {
+          RowID: shopPerson.RowID,
+          kind: "customer",
+          sessionId: token,
+        };
+
+        c.set("customer", shopCustomer);
+      }
     }
 
     await next();
@@ -350,4 +408,16 @@ export async function requireAdmin(
     c,
     next,
   );
+}
+
+
+/**
+ * Authenticated customer or admin access for customer-facing shop flows.
+ * Admin sessions are mapped to a Person record using their verified mobile.
+ */
+export async function requireShopAuth(
+  c: Context,
+  next: Next,
+) {
+  return authenticate(c, next, "shop");
 }

@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
 import { resolveProductPricing } from "../pricing/price.service.js";
+import { getProductStockQuantityForBranch } from "../products/product.repository.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import type {
   CartItem,
@@ -367,6 +368,17 @@ export async function addToCart(
 
   validateQuantity(newQuantity, good);
 
+  if (branchId !== undefined) {
+    const availableQuantity = await getProductStockQuantityForBranch(goodId, branchId);
+    if (newQuantity > availableQuantity) {
+      throw new Error(
+        availableQuantity > 0
+          ? `موجودی این کالا در شعبه انتخاب‌شده فقط ${availableQuantity} است.`
+          : "این کالا در شعبه انتخاب‌شده موجود نیست.",
+      );
+    }
+  }
+
   if (existingItem) {
     existingItem.quantity = newQuantity;
   } else {
@@ -397,6 +409,17 @@ export async function updateCartItem(
   }
 
   validateQuantity(quantity, good);
+
+  if (branchId !== undefined) {
+    const availableQuantity = await getProductStockQuantityForBranch(goodId, branchId);
+    if (quantity > availableQuantity) {
+      throw new Error(
+        availableQuantity > 0
+          ? `موجودی این کالا در شعبه انتخاب‌شده فقط ${availableQuantity} است.`
+          : "این کالا در شعبه انتخاب‌شده موجود نیست.",
+      );
+    }
+  }
 
   const cart = await getRawCart(personId);
 

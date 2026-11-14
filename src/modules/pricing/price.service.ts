@@ -50,7 +50,7 @@ export async function resolveProductPricing(product: {
   SalePrice: number;
   DiscountPrice: number | null;
   ConsumerPrice: number | null;
-}): Promise<ProductPricing> {
+}, _options: { branchId?: number; salePriceTypeId?: number } = {}): Promise<ProductPricing> {
   return buildGlobalPricing(product);
 }
 
@@ -61,6 +61,7 @@ export async function resolveProductsPricing(
     DiscountPrice: number | null;
     ConsumerPrice: number | null;
   }>,
+  _options: { branchId?: number; salePriceTypeId?: number } = {},
 ): Promise<Map<number, ProductPricing>> {
   return new Map(products.map((product) => [
     product.RowID,

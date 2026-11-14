@@ -232,12 +232,6 @@ async function buildCartResponse(
     goods.map((good) => [good.RowID, good]),
   );
 
-  let salePriceTypeId: number | undefined;
-  if (branchId !== undefined) {
-    const configs = await prisma.$queryRaw<Array<{ SalePriceType_ID: number | null }>>(Prisma.sql`SELECT config.SalePriceType_ID FROM dbo.SiteBranchConfig config INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID AND branch.IsActive = 1 WHERE config.Branch_ID = ${branchId} AND config.IsActive = 1`);
-    if (!configs.length) throw new Error("شعبه انتخاب‌شده در فروشگاه فعال نیست.");
-    salePriceTypeId = configs[0].SalePriceType_ID == null ? undefined : Number(configs[0].SalePriceType_ID);
-  }
 
   const responseItems: CartItemResponse[] = [];
 
@@ -256,7 +250,7 @@ async function buildCartResponse(
       continue;
     }
 
-    const pricing = await resolveProductPricing(good, { branchId, salePriceTypeId });
+    const pricing = await resolveProductPricing(good);
     const unitPrice = pricing.finalPrice;
 
     responseItems.push({

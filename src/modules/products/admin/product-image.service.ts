@@ -1,8 +1,7 @@
 
-import { randomUUID } from "node:crypto";
-import { mkdir, unlink } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import path from "node:path";
-import sharp from "sharp";
+import { processImage } from "../../../shared/utils/image-processor.js";
 import { prisma } from "../../../lib/prisma.js";
 
 
@@ -13,10 +12,7 @@ type ProcessedImage = {
 };
 
 const uploadDir = path.resolve(process.cwd(), "uploads", "products");
-const maxFileSize = 8 * 1024 * 1024;
 const maxFiles = 10;
-
-const allowedFormats = new Set(["jpeg", "png", "webp", "avif"]);
 
 export class ProductImageError extends Error {}
 
@@ -41,52 +37,38 @@ export async function uploadProductImages(
     throw new ProductImageError("کالا پیدا نشد.");
   }
 
-  await mkdir(uploadDir, { recursive: true });
-
   const savedFiles: string[] = [];
 
   try {
-const processed: ProcessedImage[] = [];
+    const processed: ProcessedImage[] = [];
 
     // پردازش ترتیبی برای کنترل مصرف CPU و حافظه
     for (const file of files) {
-      if (file.size <= 0 || file.size > maxFileSize) {
-        throw new ProductImageError(
-          "حجم هر تصویر باید بیشتر از صفر و حداکثر ۸ مگابایت باشد.",
-        );
+      if (file.size <= 0) {
+        throw new ProductImageError("فایل تصویر خالی است.");
       }
 
       const input = Buffer.from(await file.arrayBuffer());
-      const metadata = await sharp(input, {
-        limitInputPixels: 40_000_000,
-        animated: false,
-      }).metadata();
-
-      if (!metadata.format || !allowedFormats.has(metadata.format)) {
+      let result;
+      try {
+        result = await processImage(input, {
+          outputDir: uploadDir,
+          quality: 82,
+          maxInputSize: 8 * 1024 * 1024,
+        });
+      } catch (error) {
         throw new ProductImageError(
-          "فرمت تصویر باید JPEG، PNG، WebP یا AVIF باشد.",
+          error instanceof Error ? error.message : "پردازش تصویر ناموفق بود.",
         );
       }
 
-      const filename = `${randomUUID()}.webp`;
-      const absolutePath = path.join(uploadDir, filename);
+      savedFiles.push(
+        result.images.thumbnail.path,
+        result.images.medium.path,
+        result.images.large.path,
+      );
 
-      await sharp(input, {
-        limitInputPixels: 40_000_000,
-        animated: false,
-      })
-        .rotate()
-        .resize({
-          width: 1600,
-          height: 1600,
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .webp({ quality: 82, effort: 4 })
-        .toFile(absolutePath);
-
-      savedFiles.push(absolutePath);
-
+      const filename = result.images.medium.filename;
       processed.push({
         filename,
         url: `/uploads/products/${filename}`,
@@ -217,16 +199,24 @@ export async function deleteProductImage(
   const prefix = "/uploads/products/";
   const url = image.ImageUrl;
 
-  if (
-    url?.startsWith(prefix) &&
-    path.basename(url) === url.slice(prefix.length) &&
-    /^[\w-]+\.webp$/.test(path.basename(url))
-  ) {
-    const filePath = path.resolve(uploadDir, path.basename(url));
+  if (url?.startsWith(prefix) && path.basename(url) === url.slice(prefix.length)) {
+    const filename = path.basename(url);
+    const match = filename.match(/^([\\w-]+)-(thumbnail|medium|large)\\.webp$/);
 
-    if (path.dirname(filePath) === uploadDir) {
-      await unlink(filePath).catch(() => undefined);
-    }
+    const filenames = match
+      ? ["thumbnail", "medium", "large"].map((size) => `${match[1]}-${size}.webp`)
+      : /^[\\w-]+\\.webp$/.test(filename)
+        ? [filename] // سازگاری با تصاویر قدیمی
+        : [];
+
+    await Promise.all(
+      filenames.map((managedFilename) => {
+        const filePath = path.resolve(uploadDir, managedFilename);
+        return path.dirname(filePath) === uploadDir
+          ? unlink(filePath).catch(() => undefined)
+          : Promise.resolve();
+      }),
+    );
   }
 
   return true;

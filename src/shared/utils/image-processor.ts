@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 
 const MAX_INPUT_SIZE = 10 * 1024 * 1024; // 10 MB
 
-const ALLOWED_FORMATS = ["jpeg", "png", "webp"] as const;
+const ALLOWED_FORMATS = ["jpeg", "png", "webp", "avif"] as const;
 
 const IMAGE_SIZES = {
   thumbnail: 300,
@@ -62,6 +62,7 @@ export async function processImage(
   const metadata = await sharp(input, {
     failOn: "error",
     limitInputPixels: 40_000_000,
+    animated: false,
   }).metadata();
 
   if (!metadata.format || !ALLOWED_FORMATS.includes(
@@ -93,6 +94,7 @@ export async function processImage(
       const result = await sharp(input, {
         failOn: "error",
         limitInputPixels: 40_000_000,
+        animated: false,
       })
         .rotate()
         .resize({

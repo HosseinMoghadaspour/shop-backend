@@ -650,17 +650,24 @@ async function createOrderInternal(
   const branchConfigs = await prisma.$queryRaw<Array<{
     Branch_ID: number;
     City_ID: number;
-    SalePriceType_ID: number | null;
+    Warehouse_ID: number;
   }>>(Prisma.sql`
-    SELECT config.Branch_ID, config.City_ID, config.SalePriceType_ID
+    SELECT config.Branch_ID, config.City_ID, config.Warehouse_ID
     FROM dbo.SiteBranchConfig config
-    INNER JOIN dbo.Branch branch ON branch.RowID = config.Branch_ID AND branch.IsActive = 1
-    WHERE config.Branch_ID = ${data.branchId} AND config.IsActive = 1
+    INNER JOIN dbo.Branch branch
+      ON branch.RowID = config.Branch_ID AND branch.IsActive = 1
+    INNER JOIN dbo.Warehouse warehouse
+      ON warehouse.RowID = config.Warehouse_ID
+      AND warehouse.Branch_ID = branch.RowID
+      AND warehouse.IsActive = 1
+    WHERE config.Branch_ID = ${data.branchId}
+      AND config.IsActive = 1
+      AND config.Warehouse_ID IS NOT NULL
   `);
 
   const branchConfig = branchConfigs[0];
   if (!branchConfig || Number(branchConfig.City_ID) !== Number(deliveryCityId)) {
-    throw new Error("شعبه انتخاب‌شده برای شهر آدرس تحویل فعال نیست.");
+    throw new Error("شعبه انتخاب‌شده برای شهر آدرس تحویل فعال نیست یا انبار فعالی ندارد.");
   }
 
   const cart =
@@ -886,33 +893,15 @@ async function createOrderInternal(
     taxPrice;
 
   const appSetting = await prisma.appSettings.findFirst({
-    select: { FinancialYear_ID: true, SiteWareHouseID: true },
+    select: { FinancialYear_ID: true },
   });
 
   const branchId = data.branchId;
   const financialYearId = appSetting?.FinancialYear_ID ?? 2;
-  const warehouseId =
-    appSetting?.SiteWareHouseID == null
-      ? null
-      : Number(appSetting.SiteWareHouseID);
+  const warehouseId = Number(branchConfig.Warehouse_ID);
 
-  // Warehouse is a store-wide accounting setting, not a branch setting.
-  // WhDocH requires Warehouse_ID, so checkout can proceed only when the
-  // accounting integration has a valid global store warehouse configured.
-  if (warehouseId == null || !Number.isSafeInteger(warehouseId) || warehouseId <= 0) {
-    throw new Error(
-      "انبار عمومی فروشگاه در تنظیمات حسابداری مشخص نشده است.",
-    );
-  }
-
-  const activeAccountingWarehouse = await prisma.warehouse.findFirst({
-    where: { RowID: warehouseId, IsActive: true },
-    select: { RowID: true },
-  });
-  if (!activeAccountingWarehouse) {
-    throw new Error(
-      "انبار عمومی فروشگاه در تنظیمات حسابداری فعال یا معتبر نیست.",
-    );
+  if (!Number.isSafeInteger(warehouseId) || warehouseId <= 0) {
+    throw new Error("انبار شعبه انتخاب‌شده معتبر نیست.");
   }
 
   const orderResponse =

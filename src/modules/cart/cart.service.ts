@@ -2,7 +2,6 @@ import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
 import { resolveProductPricing } from "../pricing/price.service.js";
 import { getProductStockQuantityForBranch } from "../products/product.repository.js";
-import { Prisma } from "../../generated/prisma/client.js";
 import type {
   CartItem,
   CartItemResponse,

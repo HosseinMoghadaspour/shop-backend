@@ -8,7 +8,7 @@ import {
   startOrderPayment,
   submitOrderPaymentReceipt,
 } from "./payment.controller.js";
-import { requireCustomerAuth } from "../../middleware/auth.middleware.js";
+import { requireShopAuth } from "../../middleware/auth.middleware.js";
 
 
 const paymentRoutes = new Hono();
@@ -35,7 +35,7 @@ paymentRoutes.get(
 
 paymentRoutes.post(
   "/order/:orderId",
-  requireCustomerAuth,
+  requireShopAuth,
   startOrderPayment,
 );
 
@@ -46,7 +46,7 @@ paymentRoutes.get(
 
 paymentRoutes.post(
   "/order/:orderId/receipt",
-  requireCustomerAuth,
+  requireShopAuth,
   submitOrderPaymentReceipt,
 );
 

@@ -9,12 +9,12 @@ import {
 } from "./cart.controller.js";
 
 import {
-  requireCustomerAuth,
+  requireShopAuth,
 } from "../../middleware/auth.middleware.js";
 
 export const cartRoutes = new Hono();
 
-cartRoutes.use("*", requireCustomerAuth);
+cartRoutes.use("*", requireShopAuth);
 
 cartRoutes.get("/", getMyCart);
 

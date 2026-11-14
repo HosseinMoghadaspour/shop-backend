@@ -1,4 +1,3 @@
-
 import type { Context } from "hono";
 import { z } from "zod";
 import {
@@ -11,7 +10,6 @@ const listQuerySchema = z.object({
   visibility: z.enum(["all", "visible", "hidden"]).default("all"),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
-  branchId: z.coerce.number().int().positive(),
 });
 
 const visibilitySchema = z.object({
@@ -20,109 +18,51 @@ const visibilitySchema = z.object({
 
 export async function listAdminProducts(c: Context) {
   const parsed = listQuerySchema.safeParse(c.req.query());
-
   if (!parsed.success) {
-    return c.json(
-      {
-        success: false,
-        message: "پارامترهای فهرست کالا نامعتبر هستند.",
-      },
-      400,
-    );
+    return c.json({ success: false, message: "پارامترهای فهرست کالا نامعتبر هستند." }, 400);
   }
 
-  let result: Awaited<ReturnType<typeof findAdminProducts>>;
   try {
-    result = await findAdminProducts(parsed.data);
+    const result = await findAdminProducts(parsed.data);
+    return c.json({
+      success: true,
+      data: result.items,
+      pagination: result.pagination,
+    });
   } catch (error) {
-    return c.json(
-      {
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "دریافت کالاهای شعبه ناموفق بود.",
-      },
-      400,
-    );
+    return c.json({
+      success: false,
+      message: error instanceof Error ? error.message : "دریافت فهرست کالاها ناموفق بود.",
+    }, 400);
   }
-
-  return c.json({
-    branch: result.branch,
-    success: true,
-    data: result.items,
-    pagination: result.pagination,
-  });
 }
 
 export async function changeProductVisibility(c: Context) {
   const id = Number(c.req.param("id"));
-
   if (!Number.isSafeInteger(id) || id <= 0) {
-    return c.json(
-      {
-        success: false,
-        message: "شناسه کالا نامعتبر است.",
-      },
-      400,
-    );
+    return c.json({ success: false, message: "شناسه کالا نامعتبر است." }, 400);
   }
 
   let body: unknown;
-
   try {
     body = await c.req.json();
   } catch {
-    return c.json(
-      {
-        success: false,
-        message: "بدنه درخواست JSON معتبر نیست.",
-      },
-      400,
-    );
+    return c.json({ success: false, message: "بدنه درخواست JSON معتبر نیست." }, 400);
   }
 
   const parsed = visibilitySchema.safeParse(body);
-
   if (!parsed.success) {
-    return c.json(
-      {
-        success: false,
-        message: "وضعیت نمایش باید true یا false باشد.",
-      },
-      400,
-    );
+    return c.json({ success: false, message: "وضعیت نمایش باید true یا false باشد." }, 400);
   }
 
-  const branchId = Number(c.req.query("branchId"));
-  if (!Number.isSafeInteger(branchId) || branchId <= 0) {
-    return c.json(
-      { success: false, message: "ابتدا شعبه را انتخاب کنید." },
-      400,
-    );
-  }
-
-  const product = await updateAdminProductVisibility(
-    id,
-    parsed.data.isVisible,
-    branchId,
-  );
-
+  const product = await updateAdminProductVisibility(id, parsed.data.isVisible);
   if (!product) {
-    return c.json(
-      {
-        success: false,
-        message: "کالا پیدا نشد.",
-      },
-      404,
-    );
+    return c.json({ success: false, message: "کالا پیدا نشد." }, 404);
   }
 
   return c.json({
     success: true,
-    message: parsed.data.isVisible
-      ? "نمایش کالا در سایت فعال شد."
-      : "نمایش کالا در سایت غیرفعال شد.",
+    message: parsed.data.isVisible ? "کالا در کل فروشگاه فعال شد." : "کالا در کل فروشگاه غیرفعال شد.",
     data: {
       id: product.RowID,
       isVisible: product.IsShowInOnlineShop ?? false,

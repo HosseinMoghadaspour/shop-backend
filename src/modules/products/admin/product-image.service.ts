@@ -49,7 +49,7 @@ export async function uploadProductImages(
       }
 
       const input = Buffer.from(await file.arrayBuffer());
-      let result;
+      let result: Awaited<ReturnType<typeof processImage>>;
       try {
         result = await processImage(input, {
           outputDir: uploadDir,

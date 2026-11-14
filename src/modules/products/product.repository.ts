@@ -258,6 +258,28 @@ async function findProductStockInfo(
   return stockInfoByProductId.get(productId) ?? [];
 }
 
+export async function getProductStockQuantityForBranch(
+  productId: number,
+  branchId: number,
+): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ Quantity: unknown }>>(Prisma.sql`
+    SELECT TOP 1 sr.Quantity
+    FROM dbo.SiteBranchConfig config
+    INNER JOIN dbo.Branch branch
+      ON branch.RowID = config.Branch_ID AND branch.IsActive = 1
+    INNER JOIN dbo.Warehouse warehouse
+      ON warehouse.RowID = config.Warehouse_ID
+      AND warehouse.Branch_ID = branch.RowID
+      AND warehouse.IsActive = 1
+    INNER JOIN dbo.GoodView gv ON gv.ID = ${productId}
+    INNER JOIN dbo.GoodStockReport sr
+      ON sr.ID = gv.ID AND sr.Warehouse_ID = warehouse.RowID
+    WHERE config.Branch_ID = ${branchId}
+      AND config.IsActive = 1
+  `);
+  return Math.max(0, Number(rows[0]?.Quantity ?? 0));
+}
+
 function buildProductWhere(filters: ProductFilters): Prisma.GoodWhereInput {
   return {
     IsActive: true,

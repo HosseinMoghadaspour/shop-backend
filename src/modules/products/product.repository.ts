@@ -421,7 +421,7 @@ export async function getAmazingProducts(limit = 12, options: Pick<ProductFilter
   return Promise.all(products.map(async (product) => {
     const [images, stockInfo] = await Promise.all([
       findProductImages(product.RowID),
-      findProductStockInfo(product.RowID),
+      findProductStockInfo(product.RowID, options.branchId),
     ]);
     return { ...mapProduct(product), pricing: pricing.get(product.RowID)!, images, stockInfo };
   }));

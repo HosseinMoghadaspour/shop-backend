@@ -1,12 +1,9 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, unlink } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import path from "node:path";
-import sharp from "sharp";
+import { processImage } from "../../shared/utils/image-processor.js";
 import { prisma } from "../../lib/prisma.js";
 
 const uploadDir = path.resolve(process.cwd(), "uploads", "sliders");
-const maxFileSize = 8 * 1024 * 1024;
-const allowedFormats = new Set(["jpeg", "png", "webp", "avif"]);
 
 export class AdminSliderError extends Error {}
 
@@ -103,25 +100,26 @@ export async function uploadAdminSliderImage(id: bigint, file: File) {
     select: { RowID: true, UrlImage: true },
   });
   if (!existing) throw new AdminSliderError("اسلایدر پیدا نشد.");
-  if (file.size <= 0 || file.size > maxFileSize) {
-    throw new AdminSliderError("حجم تصویر باید بیشتر از صفر و حداکثر ۸ مگابایت باشد.");
+  if (file.size <= 0) {
+    throw new AdminSliderError("فایل تصویر خالی است.");
   }
 
   const input = Buffer.from(await file.arrayBuffer());
-  const metadata = await sharp(input, { limitInputPixels: 40_000_000, animated: false }).metadata();
-  if (!metadata.format || !allowedFormats.has(metadata.format)) {
-    throw new AdminSliderError("فرمت تصویر باید JPEG، PNG، WebP یا AVIF باشد.");
+  let processed;
+  try {
+    processed = await processImage(input, {
+      outputDir: uploadDir,
+      quality: 84,
+      maxInputSize: 8 * 1024 * 1024,
+    });
+  } catch (error) {
+    throw new AdminSliderError(
+      error instanceof Error ? error.message : "پردازش تصویر اسلایدر ناموفق بود.",
+    );
   }
 
-  await mkdir(uploadDir, { recursive: true });
-  const filename = `${randomUUID()}.webp`;
-  const absolutePath = path.join(uploadDir, filename);
-  await sharp(input, { limitInputPixels: 40_000_000, animated: false })
-    .rotate()
-    .resize({ width: 1920, height: 1200, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: 84, effort: 4 })
-    .toFile(absolutePath);
-
+  // اسلایدر از نسخه بزرگ استفاده می‌کند.
+  const filename = processed.images.large.filename;
   const url = `/uploads/sliders/${filename}`;
   try {
     const updated = await prisma.siteSlider.update({
@@ -132,7 +130,11 @@ export async function uploadAdminSliderImage(id: bigint, file: File) {
     await removeManagedSliderFile(existing.UrlImage);
     return updated;
   } catch (error) {
-    await unlink(absolutePath).catch(() => undefined);
+    await Promise.all(
+      Object.values(processed.images).map((image) =>
+        unlink(image.path).catch(() => undefined),
+      ),
+    );
     throw error;
   }
 }
@@ -152,6 +154,18 @@ export async function removeManagedSliderFile(url: string | null) {
   const prefix = "/uploads/sliders/";
   if (!url?.startsWith(prefix)) return;
   const filename = url.slice(prefix.length);
-  if (path.basename(filename) !== filename || !/^[\w-]+\.webp$/.test(filename)) return;
-  await unlink(path.resolve(uploadDir, filename)).catch(() => undefined);
+  if (path.basename(filename) !== filename) return;
+
+  const match = filename.match(/^([\\w-]+)-(thumbnail|medium|large)\\.webp$/);
+  const filenames = match
+    ? ["thumbnail", "medium", "large"].map((size) => `${match[1]}-${size}.webp`)
+    : /^[\\w-]+\\.webp$/.test(filename)
+      ? [filename]
+      : [];
+
+  await Promise.all(
+    filenames.map((managedFilename) =>
+      unlink(path.resolve(uploadDir, managedFilename)).catch(() => undefined),
+    ),
+  );
 }

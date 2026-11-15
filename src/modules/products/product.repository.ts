@@ -287,7 +287,7 @@ function buildProductWhere(filters: ProductFilters): Prisma.GoodWhereInput {
     IsShowInOnlineShop: true,
     ...(filters.search
       ? {
-          AND: filters.search.split(/\\s+/).filter(Boolean).map((term) => ({
+          AND: filters.search.split(/\s+/).filter(Boolean).map((term) => ({
             OR: [
               { RowName: { contains: term } },
               { RowCode: { contains: term } },

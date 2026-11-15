@@ -1,8 +1,18 @@
 import { z } from "zod";
 
+function normalizeSearch(value: string): string {
+  return value
+    .replace(/[يى]/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/\\s+/g, " ")
+    .trim();
+}
+
 export const productQuerySchema = z
   .object({
-    search: z.string().trim().min(1).optional(),
+    search: z.string().trim().min(1).transform(normalizeSearch).optional(),
     categoryId: z.coerce.number().int().positive().optional(),
     brandId: z.coerce.number().int().positive().optional(),
     producerId: z.coerce.number().int().positive().optional(),

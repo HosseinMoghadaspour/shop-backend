@@ -7,6 +7,7 @@ import { resolveProductsPricing, resolveProductPricing } from "../pricing/price.
 export interface ProductFilters {
   search?: string;
   categoryId?: number;
+  categoryIds?: number[];
   brandId?: number;
   producerId?: number;
   minPrice?: number;
@@ -286,15 +287,19 @@ function buildProductWhere(filters: ProductFilters): Prisma.GoodWhereInput {
     IsShowInOnlineShop: true,
     ...(filters.search
       ? {
-          OR: [
-            { RowName: { contains: filters.search } },
-            { RowCode: { contains: filters.search } },
-            { RowNameAlias: { contains: filters.search } },
-            { SiteName: { contains: filters.search } },
-          ],
+          AND: filters.search.split(/\\s+/).filter(Boolean).map((term) => ({
+            OR: [
+              { RowName: { contains: term } },
+              { RowCode: { contains: term } },
+              { RowNameAlias: { contains: term } },
+              { SiteName: { contains: term } },
+            ],
+          })),
         }
       : {}),
-    ...(filters.categoryId !== undefined ? { GoodCategory_ID: filters.categoryId } : {}),
+    ...(filters.categoryId !== undefined
+      ? { GoodCategory_ID: { in: filters.categoryIds?.length ? filters.categoryIds : [filters.categoryId] } }
+      : {}),
     ...(filters.brandId !== undefined ? { BrandID: filters.brandId } : {}),
     ...(filters.producerId !== undefined ? { Producers_ID: BigInt(filters.producerId) } : {}),
     ...(filters.isSpecialSale !== undefined ? { IsSpecialSale: filters.isSpecialSale } : {}),
@@ -349,7 +354,40 @@ async function loadProducts(where: Prisma.GoodWhereInput, filters: ProductFilter
 }
 
 
+async function findCategoryAndDescendantIds(categoryId: number): Promise<number[]> {
+  const categories = await prisma.goodCategory.findMany({
+    where: { IsActive: true, IsShowInOnlineShop: true },
+    select: { RowID: true, GoodCategory_ID: true },
+  });
+
+  const childrenByParent = new Map<number, number[]>();
+  for (const category of categories) {
+    const parentId = category.GoodCategory_ID ?? 0;
+    const children = childrenByParent.get(parentId) ?? [];
+    children.push(category.RowID);
+    childrenByParent.set(parentId, children);
+  }
+
+  const result: number[] = [];
+  const visited = new Set<number>();
+  const queue = [categoryId];
+  while (queue.length) {
+    const currentId = queue.shift()!;
+    if (visited.has(currentId)) continue;
+    visited.add(currentId);
+    result.push(currentId);
+    queue.push(...(childrenByParent.get(currentId) ?? []));
+  }
+  return result;
+}
+
 export async function findProducts(filters: ProductFilters) {
+  if (filters.categoryId !== undefined) {
+    filters = {
+      ...filters,
+      categoryIds: await findCategoryAndDescendantIds(filters.categoryId),
+    };
+  }
   const where = buildProductWhere(filters);
   const result = await loadProducts(where, filters);
 

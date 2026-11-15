@@ -298,7 +298,7 @@ function buildProductWhere(filters: ProductFilters): Prisma.GoodWhereInput {
         }
       : {}),
     ...(filters.categoryId !== undefined
-      ? { GoodCategory_ID: { in: filters.categoryIds?.length ? filters.categoryIds : [filters.categoryId] } }
+      ? { GoodCategory_ID: { in: filters.categoryIds?.length ? filters.categoryIds : [filters.categoryId!] } }
       : {}),
     ...(filters.brandId !== undefined ? { BrandID: filters.brandId } : {}),
     ...(filters.producerId !== undefined ? { Producers_ID: BigInt(filters.producerId) } : {}),

@@ -864,9 +864,9 @@ model Person {
   WhDocHEdited                      WhDocHEdited[]
   WhDocHMarketerPercent             WhDocHMarketerPercent[]
 
+  SiteOrderRequest                  SiteOrderRequest[]
   @@index([Fix_PersonType_ID, IsActive], map: "<Name of Missing Index, sysname,>")
   @@index([Reversion], map: "NonClusteredIndex-20230917-185540")
-  SiteOrderRequest SiteOrderRequest[]
   @@map("Person")
   @@schema("dbo")
 }

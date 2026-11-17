@@ -24,8 +24,8 @@ export const env = {
   },
 
   redis: {
-  url: "redis://127.0.0.1:6379",
-},
+    url: process.env.REDIS_URL ?? "redis://127.0.0.1:6379",
+  },
 
   database: {
     server: required("DB_SERVER"),
@@ -33,9 +33,7 @@ export const env = {
     database: required("DB_DATABASE"),
     user: required("DB_USER"),
     password: required("DB_PASSWORD"),
-
     encrypt: process.env.DB_ENCRYPT === "true",
-
     trustServerCertificate:
       process.env.DB_TRUST_SERVER_CERTIFICATE !== "false",
   },

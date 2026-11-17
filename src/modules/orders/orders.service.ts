@@ -425,6 +425,8 @@ const orderHeaderSelect = {
   TaxPercent: true,
   TaxPrice:true,
   OrderStatus: true,
+  Fix_OrderDeliveryStatus: { select: { RowName: true } },
+  Fix_OrderPaymentConfirmationStatus: { select: { RowName: true } },
 } satisfies Prisma.OrderHSelect;
 
 const orderDetailSelect = {
@@ -458,6 +460,8 @@ function serializeOrderHeader<T extends { RowID: bigint; DocNo: bigint }>(
     ...order,
     RowID: Number(order.RowID),
     DocNo: Number(order.DocNo),
+    DeliveryStatusName: (order as T & { Fix_OrderDeliveryStatus?: { RowName: string } | null }).Fix_OrderDeliveryStatus?.RowName ?? null,
+    PaymentStatusName: (order as T & { Fix_OrderPaymentConfirmationStatus?: { RowName: string } | null }).Fix_OrderPaymentConfirmationStatus?.RowName ?? null,
   };
 }
 

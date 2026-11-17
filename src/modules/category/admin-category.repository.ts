@@ -199,3 +199,11 @@ export async function updateCategoryParent(id: number, parentId: number | null) 
     },
   };
 }
+
+export async function findAdminCategoryParents() {
+  return prisma.goodCategory.findMany({
+    where: { IsActive: true },
+    orderBy: [{ RowName: "asc" }, { RowID: "asc" }],
+    select: { RowID: true, RowName: true },
+  });
+}

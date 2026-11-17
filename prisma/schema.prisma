@@ -658,6 +658,16 @@ model OrderD {
   @@schema("dbo")
 }
 
+model SiteCategoryConfig {
+  Category_ID       Int      @id(map: "PK_SiteCategoryConfig")
+  ParentCategory_ID Int?
+  UpdatedAt         DateTime @default(now()) @db.DateTime
+
+  @@index([ParentCategory_ID], map: "IX_SiteCategoryConfig_ParentCategory")
+  @@map("SiteCategoryConfig")
+  @@schema("dbo")
+}
+
 model SiteOrderRequest {
   RowID         BigInt   @id(map: "PK_SiteOrderRequest") @default(autoincrement())
   OrderH_ID     BigInt

@@ -595,6 +595,7 @@ model OrderH {
   Fix_OrderSendID                                                   Int?
   OrderStatus                                                       Boolean?
   orderDetails                                                      OrderD[]                            @relation("OrderDetails")
+  SiteOrderRequest                                                   SiteOrderRequest[]
   BankAccount_OrderH_PaymentConfirmationBankAccount_IDToBankAccount BankAccount?                        @relation("OrderH_PaymentConfirmationBankAccount_IDToBankAccount", fields: [PaymentConfirmationBankAccount_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_OrderH_BankAccount")
   BankAccount_OrderH_DepositBankAccount_IDToBankAccount             BankAccount?                        @relation("OrderH_DepositBankAccount_IDToBankAccount", fields: [DepositBankAccount_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_OrderH_BankAccount_2")
   Branch                                                            Branch?                             @relation(fields: [Branch_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction, map: "FK_OrderH_Branch")
@@ -667,6 +668,8 @@ model SiteOrderRequest {
   AdminResponse String?  @db.NVarChar(1000)
   CreatedAt     DateTime @default(now()) @db.DateTime
   UpdatedAt     DateTime? @db.DateTime
+  OrderH        OrderH   @relation(fields: [OrderH_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction)
+  Person        Person   @relation(fields: [Person_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([OrderH_ID, Person_ID, CreatedAt], map: "IX_SiteOrderRequest_Order_Person")
   @@index([Status, CreatedAt], map: "IX_SiteOrderRequest_Status_CreatedAt")
@@ -863,6 +866,7 @@ model Person {
 
   @@index([Fix_PersonType_ID, IsActive], map: "<Name of Missing Index, sysname,>")
   @@index([Reversion], map: "NonClusteredIndex-20230917-185540")
+  SiteOrderRequest SiteOrderRequest[]
   @@map("Person")
   @@schema("dbo")
 }

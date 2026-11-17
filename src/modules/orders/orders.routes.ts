@@ -9,6 +9,10 @@ import {
 import {
   requireShopAuth,
 } from "../../middleware/auth.middleware.js";
+import {
+  createOrderRequestController,
+  listCustomerOrderRequestsController,
+} from "./order-requests.controller.js";
 
 export const ordersRoutes =
   new Hono();
@@ -25,6 +29,9 @@ ordersRoutes.get(
   requireShopAuth,
   getOrdersController,
 );
+
+ordersRoutes.post("/:id/requests", requireShopAuth, createOrderRequestController);
+ordersRoutes.get("/:id/requests", requireShopAuth, listCustomerOrderRequestsController);
 
 ordersRoutes.get(
   "/:id",

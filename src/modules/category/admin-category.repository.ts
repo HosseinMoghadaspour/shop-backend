@@ -15,29 +15,20 @@ export async function findAdminCategories(filters: AdminCategoryFilters) {
     ...(filters.visibility === "visible"
       ? { IsShowInOnlineShop: true }
       : filters.visibility === "hidden"
-        ? {
-            OR: [
-              { IsShowInOnlineShop: false },
-              { IsShowInOnlineShop: null },
-            ],
-          }
+        ? { OR: [{ IsShowInOnlineShop: false }, { IsShowInOnlineShop: null }] }
         : {}),
     ...(filters.search
       ? {
-          AND: [
-            {
-              OR: [
-                { RowName: { contains: filters.search } },
-                { RowCode: { contains: filters.search } },
-              ],
-            },
+          OR: [
+            { RowName: { contains: filters.search } },
+            { RowCode: { contains: filters.search } },
           ],
         }
       : {}),
   };
 
   const skip = (filters.page - 1) * filters.limit;
-  const [categories, total] = await Promise.all([
+  const [categories, total, hierarchyOverrides, categoryNames] = await Promise.all([
     prisma.goodCategory.findMany({
       where,
       select: {
@@ -45,37 +36,48 @@ export async function findAdminCategories(filters: AdminCategoryFilters) {
         RowCode: true,
         RowName: true,
         GoodCategory_ID: true,
-        GoodCategory: { select: { RowName: true } },
         IsActive: true,
         IsShowInOnlineShop: true,
         ShowOrder: true,
         OnlineCategoryImage: true,
         IconName: true,
       },
-      orderBy: [
-        { ShowOrder: "asc" },
-        { RowName: "asc" },
-        { RowID: "asc" },
-      ],
+      orderBy: [{ ShowOrder: "asc" }, { RowName: "asc" }, { RowID: "asc" }],
       skip,
       take: filters.limit,
     }),
     prisma.goodCategory.count({ where }),
+    prisma.siteCategoryConfig.findMany({
+      select: { Category_ID: true, ParentCategory_ID: true },
+    }),
+    prisma.goodCategory.findMany({
+      select: { RowID: true, RowName: true },
+    }),
   ]);
 
+  const overrideMap = new Map(
+    hierarchyOverrides.map((item) => [item.Category_ID, item.ParentCategory_ID]),
+  );
+  const nameMap = new Map(categoryNames.map((item) => [item.RowID, item.RowName]));
+
   return {
-    items: categories.map((category) => ({
-      id: category.RowID,
-      code: category.RowCode,
-      name: category.RowName,
-      parentId: category.GoodCategory_ID,
-      parentName: category.GoodCategory?.RowName ?? null,
-      isActive: category.IsActive,
-      isVisible: category.IsShowInOnlineShop ?? false,
-      sortOrder: category.ShowOrder ?? 0,
-      image: category.OnlineCategoryImage,
-      iconName: category.IconName,
-    })),
+    items: categories.map((category) => {
+      const parentId = overrideMap.has(category.RowID)
+        ? overrideMap.get(category.RowID) ?? null
+        : category.GoodCategory_ID;
+      return {
+        id: category.RowID,
+        code: category.RowCode,
+        name: category.RowName,
+        parentId,
+        parentName: parentId ? nameMap.get(parentId) ?? null : null,
+        isActive: category.IsActive,
+        isVisible: category.IsShowInOnlineShop ?? false,
+        sortOrder: category.ShowOrder ?? 0,
+        image: category.OnlineCategoryImage,
+        iconName: category.IconName,
+      };
+    }),
     pagination: {
       page: filters.page,
       limit: filters.limit,
@@ -144,4 +146,54 @@ export async function updateCategoryIcon(id: number, iconName: string | null) {
   });
 
   return { id: category.RowID, iconName: category.IconName };
+}
+
+export async function updateCategoryParent(id: number, parentId: number | null) {
+  const categories = await prisma.goodCategory.findMany({
+    where: { IsActive: true },
+    select: { RowID: true, GoodCategory_ID: true },
+  });
+  const category = categories.find((item) => item.RowID === id);
+  if (!category) return { kind: "category-not-found" as const };
+
+  if (parentId !== null) {
+    const parent = categories.find((item) => item.RowID === parentId);
+    if (!parent) return { kind: "parent-not-found" as const };
+    if (parentId === id) return { kind: "self-parent" as const };
+  }
+
+  const overrides = await prisma.siteCategoryConfig.findMany({
+    select: { Category_ID: true, ParentCategory_ID: true },
+  });
+  const overrideMap = new Map(overrides.map((item) => [item.Category_ID, item.ParentCategory_ID]));
+  const parentMap = new Map(categories.map((item) => [
+    item.RowID,
+    overrideMap.has(item.RowID)
+      ? overrideMap.get(item.RowID) ?? null
+      : item.GoodCategory_ID ?? null,
+  ]));
+
+  let cursor = parentId;
+  const visited = new Set<number>();
+  while (cursor !== null && cursor !== undefined) {
+    if (cursor === id) return { kind: "cycle" as const };
+    if (visited.has(cursor)) return { kind: "existing-cycle" as const };
+    visited.add(cursor);
+    cursor = parentMap.get(cursor) ?? null;
+  }
+
+  await prisma.siteCategoryConfig.upsert({
+    where: { Category_ID: id },
+    create: { Category_ID: id, ParentCategory_ID: parentId, UpdatedAt: new Date() },
+    update: { ParentCategory_ID: parentId, UpdatedAt: new Date() },
+  });
+
+  return {
+    kind: "updated" as const,
+    category: {
+      id,
+      parentId,
+      parentName: parentId === null ? null : categories.find((item) => item.RowID === parentId)?.RowName ?? null,
+    },
+  };
 }

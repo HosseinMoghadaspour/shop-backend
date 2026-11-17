@@ -53,9 +53,12 @@ export async function createOrderRequestController(c: Context) {
         ? "درخواست لغو برای بررسی مدیر ثبت شد."
         : "درخواست پشتیبانی ثبت شد.",
       data: {
-        ...result.request,
         id: Number(result.request.RowID),
         orderId: Number(result.request.OrderH_ID),
+        requestType: result.request.RequestType,
+        message: result.request.Message,
+        status: result.request.Status,
+        createdAt: result.request.CreatedAt,
       },
     }, 201);
   } catch (error) {
@@ -74,7 +77,15 @@ export async function listCustomerOrderRequestsController(c: Context) {
   if (!data) return c.json({ success: false, message: "سفارش پیدا نشد." }, 404);
   return c.json({
     success: true,
-    data: data.map((item) => ({ ...item, id: Number(item.RowID) })),
+    data: data.map((item) => ({
+      id: Number(item.RowID),
+      requestType: item.RequestType,
+      message: item.Message,
+      status: item.Status,
+      adminResponse: item.AdminResponse,
+      createdAt: item.CreatedAt,
+      updatedAt: item.UpdatedAt,
+    })),
   });
 }
 

@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import {
   findAdminCategories,
+  findAdminCategoryParents,
   updateCategoryDisplayOrder,
   updateCategoryIcon,
   updateCategoryParent,
@@ -23,8 +24,16 @@ export async function listAdminCategories(c: Context) {
   const page = positiveInt(c.req.query("page"), 1);
   const limit = Math.min(positiveInt(c.req.query("limit"), 20), 100);
 
-  const result = await findAdminCategories({ search, visibility, page, limit });
-  return c.json({ success: true, data: result.items, pagination: result.pagination });
+  const [result, parents] = await Promise.all([
+    findAdminCategories({ search, visibility, page, limit }),
+    findAdminCategoryParents(),
+  ]);
+  return c.json({
+    success: true,
+    data: result.items,
+    parents: parents.map((item) => ({ id: item.RowID, name: item.RowName })),
+    pagination: result.pagination,
+  });
 }
 
 export async function changeCategoryVisibility(c: Context) {

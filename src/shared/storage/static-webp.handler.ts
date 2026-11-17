@@ -13,6 +13,8 @@ const IMAGE_CONTENT_TYPES: Record<string, string> = {
 export function serveStaticWebp(directory: string): Handler {
   return async (c) => {
     const filename = c.req.param("filename");
+    if (!filename) return c.notFound();
+
     const extension = path.extname(filename).toLowerCase();
     const contentType = IMAGE_CONTENT_TYPES[extension];
 

@@ -27,5 +27,5 @@ BEGIN
 
     CREATE UNIQUE INDEX UX_SiteOrderRequest_OneOpenCancellation
         ON dbo.SiteOrderRequest(OrderH_ID, Person_ID)
-        WHERE RequestType = 1 AND Status IN (1, 2);
+        WHERE RequestType = 1 AND (Status = 1 OR Status = 2);
 END;

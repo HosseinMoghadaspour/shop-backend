@@ -1,8 +1,9 @@
+import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 
 export async function findAdminOrders(page: number, limit: number, search?: string) {
   const numericSearch = search && /^\d+$/.test(search) ? BigInt(search) : undefined;
-  const where = numericSearch ? { DocNo: numericSearch } : {};
+  const where: Prisma.OrderHWhereInput = numericSearch ? { DocNo: numericSearch } : {};
   const [orders, total, deliveryStatuses, paymentStatuses] = await Promise.all([
     prisma.orderH.findMany({
       where,

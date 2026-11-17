@@ -657,6 +657,23 @@ model OrderD {
   @@schema("dbo")
 }
 
+model SiteOrderRequest {
+  RowID         BigInt   @id(map: "PK_SiteOrderRequest") @default(autoincrement())
+  OrderH_ID     BigInt
+  Person_ID     Int
+  RequestType   Int      @db.TinyInt
+  Message       String   @db.NVarChar(1000)
+  Status        Int      @default(1) @db.TinyInt
+  AdminResponse String?  @db.NVarChar(1000)
+  CreatedAt     DateTime @default(now()) @db.DateTime
+  UpdatedAt     DateTime? @db.DateTime
+
+  @@index([OrderH_ID, Person_ID, CreatedAt], map: "IX_SiteOrderRequest_Order_Person")
+  @@index([Status, CreatedAt], map: "IX_SiteOrderRequest_Status_CreatedAt")
+  @@map("SiteOrderRequest")
+  @@schema("dbo")
+}
+
 model SiteModuleOrder {
   RowID     Int      @id(map: "PK_SiteModuleOrder")
   Name      String?  @db.NVarChar(50)

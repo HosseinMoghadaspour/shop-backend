@@ -32,12 +32,19 @@ export async function findCategories(): Promise<CategoryRecord[]> {
     ],
   });
 
+  const hierarchyOverrides = await prisma.siteCategoryConfig.findMany({
+    select: { Category_ID: true, ParentCategory_ID: true },
+  });
+  const overrideMap = new Map(hierarchyOverrides.map((item) => [item.Category_ID, item.ParentCategory_ID]));
+
   return categories.map((category) => ({
     id: category.RowID,
     code: category.RowCode,
     name: category.RowName,
     url: category.URL,
-    parentId: category.GoodCategory_ID ?? 0,
+    parentId: overrideMap.has(category.RowID)
+      ? overrideMap.get(category.RowID) ?? 0
+      : category.GoodCategory_ID ?? 0,
     sortOrder: category.ShowOrder ?? 999999,
     onlineCategoryImage: category.OnlineCategoryImage,
     iconName: category.IconName

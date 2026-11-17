@@ -486,43 +486,45 @@ export async function requestOtp(
     },
   );
 
-  if (
-    process.env.NODE_ENV !==
-    "production"
-  ) {
-const apiKey = process.env.KAVENEGAR_API_KEY;
-
-const receptor = phone;
-const template = "login";
-
-const url =
-  `https://api.kavenegar.com/v1/${apiKey}/verify/lookup.json` +
-  `?receptor=${encodeURIComponent(receptor)}` +
-  `&token=${encodeURIComponent(otp)}` +
-  `&template=${encodeURIComponent(template)}`;
-
-const response = await fetch(url);
-
-const data = await response.json();
-
-console.log(data);
+  if (process.env.NODE_ENV !== "production") {
     return {
       success: true,
-      message:
-        "کد تأیید ایجاد شد.",
-      developmentOtp:
-        otp,
+      message: "کد تأیید ایجاد شد.",
+      developmentOtp: otp,
     };
   }
 
-  /**
-   * TODO:
-   * SMS provider.
-   */
+  const apiKey = process.env.KAVENEGAR_API_KEY;
+
+  if (!apiKey) {
+    await Promise.all([redis.del(key), redis.del(cooldownKey)]);
+    throw new Error("تنظیمات سرویس پیامک کامل نیست.");
+  }
+
+  const smsUrl = new URL(
+    `https://api.kavenegar.com/v1/${encodeURIComponent(apiKey)}/verify/lookup.json`,
+  );
+  smsUrl.searchParams.set("receptor", normalizedPhone);
+  smsUrl.searchParams.set("token", otp);
+  smsUrl.searchParams.set("template", "login");
+
+  try {
+    const response = await fetch(smsUrl);
+    const result = (await response.json()) as {
+      return?: { status?: number };
+    };
+
+    if (!response.ok || result.return?.status !== 200) {
+      throw new Error("Kavenegar rejected the SMS request.");
+    }
+  } catch {
+    await Promise.all([redis.del(key), redis.del(cooldownKey)]);
+    throw new Error("ارسال کد تأیید با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
+  }
+
   return {
     success: true,
-    message:
-      "کد تأیید ارسال شد.",
+    message: "کد تأیید ارسال شد.",
   };
 }
 

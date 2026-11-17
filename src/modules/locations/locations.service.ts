@@ -164,7 +164,7 @@ export async function createAddressForPerson(personId: number, input: {
   });
   const provinceId = city?.County?.Province_ID;
 
-  if (provinceId == null) {
+  if (!city || provinceId == null) {
     throw new Error("شهر انتخاب‌شده معتبر نیست.");
   }
   if (!input.deliverToName.trim() || !input.deliverToMobileNumber.trim() || !input.Adrs.trim()) {

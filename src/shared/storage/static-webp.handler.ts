@@ -6,7 +6,7 @@ export function serveStaticWebp(directory: string): Handler {
   return async (c) => {
     const filename = c.req.param("filename");
 
-    if (!/^[\\w-]+\\.webp$/.test(filename)) {
+    if (!/^[\w-]+\.webp$/.test(filename)) {
       return c.notFound();
     }
 

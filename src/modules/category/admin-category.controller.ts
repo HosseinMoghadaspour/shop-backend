@@ -3,6 +3,7 @@ import {
   findAdminCategories,
   updateCategoryDisplayOrder,
   updateCategoryIcon,
+  updateCategoryParent,
   updateCategoryVisibility,
   type AdminCategoryVisibility,
 } from "./admin-category.repository.js";
@@ -122,4 +123,44 @@ export async function changeCategoryIcon(c: Context) {
   }
 
   return c.json({ success: true, data: category });
+}
+
+export async function changeCategoryParent(c: Context) {
+  const id = positiveInt(c.req.param("id"), 0);
+  if (!id) {
+    return c.json({ success: false, message: "شناسه دسته‌بندی نامعتبر است." }, 400);
+  }
+
+  let body: { parentId?: unknown };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, message: "بدنه درخواست معتبر نیست." }, 400);
+  }
+
+  const parentId = body.parentId === null
+    ? null
+    : typeof body.parentId === "number" && Number.isSafeInteger(body.parentId) && body.parentId > 0
+      ? body.parentId
+      : undefined;
+
+  if (parentId === undefined) {
+    return c.json({ success: false, message: "شناسه دسته والد معتبر نیست." }, 400);
+  }
+
+  const result = await updateCategoryParent(id, parentId);
+  if (result.kind === "category-not-found") {
+    return c.json({ success: false, message: "دسته‌بندی موردنظر پیدا نشد یا فعال نیست." }, 404);
+  }
+  if (result.kind === "parent-not-found") {
+    return c.json({ success: false, message: "دسته والد پیدا نشد یا فعال نیست." }, 404);
+  }
+  if (result.kind === "self-parent") {
+    return c.json({ success: false, message: "یک دسته نمی‌تواند والد خودش باشد." }, 400);
+  }
+  if (result.kind === "cycle" || result.kind === "existing-cycle") {
+    return c.json({ success: false, message: "این تغییر باعث ایجاد حلقه در ساختار دسته‌بندی‌ها می‌شود." }, 409);
+  }
+
+  return c.json({ success: true, data: result.category });
 }

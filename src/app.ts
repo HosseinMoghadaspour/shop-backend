@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { routes } from "./routes/index.js";
-import { errorHandler } from "./shared/errors/error-handler.js";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { swaggerUI } from "@hono/swagger-ui";
+
+import { routes } from "./routes/index.js";
+import { errorHandler } from "./shared/errors/error-handler.js";
+import { serveStaticWebp } from "./shared/storage/static-webp.handler.js";
 import { openApiDocument } from "./docs/openapi.js";
 
 export const app = new Hono();
@@ -11,14 +12,14 @@ export const app = new Hono();
 app.get("/", (c) => {
   return c.json({
     success: true,
-    message: "Shop API is running"
+    message: "Shop API is running",
   });
 });
 
-app.get("/health", async (c) => {
+app.get("/health", (c) => {
   return c.json({
     success: true,
-    message: "OK"
+    message: "OK",
   });
 });
 
@@ -35,85 +36,21 @@ app.get(
 
 app.onError(errorHandler);
 
+const uploadsDirectory = path.resolve(process.cwd(), "uploads");
 
-const sliderUploadsDir = path.resolve(process.cwd(), "uploads", "sliders");
-
-const footerUploadsDir = path.resolve(
-  process.cwd(),
-  "uploads",
-  "footer",
+app.get(
+  "/uploads/products/:filename",
+  serveStaticWebp(path.join(uploadsDirectory, "products")),
 );
 
-const productUploadsDir = path.resolve(
-  process.cwd(),
-  "uploads",
-  "products",
+app.get(
+  "/uploads/sliders/:filename",
+  serveStaticWebp(path.join(uploadsDirectory, "sliders")),
 );
-
-app.get("/uploads/products/:filename", async (c) => {
-  const filename = c.req.param("filename");
-
-  if (!/^[\w-]+\.webp$/.test(filename)) {
-    return c.notFound();
-  }
-
-  try {
-    const image = await readFile(
-      path.join(productUploadsDir, filename),
-    );
-
-    return new Response(new Uint8Array(image), {
-      headers: {
-        "Content-Type": "image/webp",
-        "Cache-Control": "public, max-age=31536000, immutable",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
-  } catch {
-    return c.notFound();
-  }
-});
-
-app.get("/uploads/sliders/:filename", async (c) => {
-  const filename = c.req.param("filename");
-  if (!/^[\w-]+\.webp$/.test(filename)) return c.notFound();
-
-  try {
-    const image = await readFile(path.join(sliderUploadsDir, filename));
-    return new Response(new Uint8Array(image), {
-      headers: {
-        "Content-Type": "image/webp",
-        "Cache-Control": "public, max-age=31536000, immutable",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
-  } catch {
-    return c.notFound();
-  }
-});
 
 app.route("/", routes);
 
-app.get("/uploads/footer/:filename", async (c) => {
-  const filename = c.req.param("filename");
-
-  if (!/^[\w-]+\.webp$/.test(filename)) {
-    return c.notFound();
-  }
-
-  try {
-    const image = await readFile(
-      path.join(footerUploadsDir, filename),
-    );
-
-    return new Response(new Uint8Array(image), {
-      headers: {
-        "Content-Type": "image/webp",
-        "Cache-Control": "public, max-age=31536000, immutable",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
-  } catch {
-    return c.notFound();
-  }
-});
+app.get(
+  "/uploads/footer/:filename",
+  serveStaticWebp(path.join(uploadsDirectory, "footer")),
+);

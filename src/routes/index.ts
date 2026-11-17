@@ -14,6 +14,7 @@ import { userInfoRoutes } from "../modules/userInfo/userInfo.routes.js";
 import { authRoutes } from "../modules/auth/auth.routes.js";
 import { cartRoutes } from "../modules/cart/cart.routes.js";
 import { ordersRoutes } from "../modules/orders/orders.routes.js";
+import { adminOrdersRoutes } from "../modules/orders/admin-orders.routes.js";
 import { locationsRoutes } from "../modules/locations/locations.routes.js";
 import { branchRoutes } from "../modules/branches/branches.routes.js";
 import paymentRoutes from "../modules/payment/payment.routes.js";
@@ -88,6 +89,7 @@ routes.route("/locations", locationsRoutes);
 routes.route("/branches", branchRoutes);
 routes.route("/payment", paymentRoutes);
 routes.route("/admin/products", adminProductRoutes);
+routes.route("/admin/orders", adminOrdersRoutes);
 routes.route("/admin/categories", adminCategoryRoutes)
 routes.route("/admin/dashboard", adminDashboardRoutes);
 routes.route("/admin/sliders", adminSliderRoutes);

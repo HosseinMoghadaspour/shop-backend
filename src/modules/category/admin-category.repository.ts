@@ -153,7 +153,7 @@ export async function updateCategoryIcon(id: number, iconName: string | null) {
 export async function updateCategoryParent(id: number, parentId: number | null) {
   const categories = await prisma.goodCategory.findMany({
     where: { IsActive: true },
-    select: { RowID: true, GoodCategory_ID: true },
+    select: { RowID: true, RowName: true, GoodCategory_ID: true },
   });
   const category = categories.find((item) => item.RowID === id);
   if (!category) return { kind: "category-not-found" as const };

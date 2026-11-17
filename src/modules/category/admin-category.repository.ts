@@ -19,10 +19,12 @@ export async function findAdminCategories(filters: AdminCategoryFilters) {
         : {}),
     ...(filters.search
       ? {
-          OR: [
+          AND: [{
+            OR: [
             { RowName: { contains: filters.search } },
             { RowCode: { contains: filters.search } },
-          ],
+            ],
+          }],
         }
       : {}),
   };

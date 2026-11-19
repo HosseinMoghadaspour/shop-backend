@@ -426,6 +426,7 @@ const orderHeaderSelect = {
   TaxPrice:true,
   OrderStatus: true,
   Fix_OrderDeliveryStatus: { select: { RowName: true } },
+  Fix_OrderSendMethod: { select: { RowID: true, RowName: true } },
   Fix_OrderPaymentConfirmationStatus: { select: { RowName: true } },
 } satisfies Prisma.OrderHSelect;
 
@@ -461,6 +462,8 @@ function serializeOrderHeader<T extends { RowID: bigint; DocNo: bigint }>(
     RowID: Number(order.RowID),
     DocNo: Number(order.DocNo),
     DeliveryStatusName: (order as T & { Fix_OrderDeliveryStatus?: { RowName: string } | null }).Fix_OrderDeliveryStatus?.RowName ?? null,
+    SendStatusId: (order as T & { Fix_OrderSendMethod?: { RowID: number; RowName: string | null } | null }).Fix_OrderSendMethod?.RowID ?? null,
+    SendStatusName: (order as T & { Fix_OrderSendMethod?: { RowID: number; RowName: string | null } | null }).Fix_OrderSendMethod?.RowName ?? null,
     PaymentStatusName: (order as T & { Fix_OrderPaymentConfirmationStatus?: { RowName: string } | null }).Fix_OrderPaymentConfirmationStatus?.RowName ?? null,
   };
 }
@@ -500,17 +503,24 @@ export async function getOrderId(id: number, personId: number) {
     return { orderH: null, orderD: [] };
   }
 
-  const details = await prisma.orderD.findMany({
-    where: {
-      OrderH_ID: order.RowID,
-      InputValue: 0,
-    },
-    select: orderDetailSelect,
-  });
+  const [details, sendStatuses] = await Promise.all([
+    prisma.orderD.findMany({
+      where: {
+        OrderH_ID: order.RowID,
+        InputValue: 0,
+      },
+      select: orderDetailSelect,
+    }),
+    prisma.fix_OrderSendMethod.findMany({
+      orderBy: { RowID: "asc" },
+      select: { RowID: true, RowName: true },
+    }),
+  ]);
 
   return {
     orderH: serializeOrderHeader(order),
     orderD: details.map(serializeOrderDetail),
+    sendStatuses,
   };
 }
 
@@ -980,6 +990,7 @@ async function createOrderInternal(
     IsOnlineOrder: true,
 
     Fix_OrderPaymentMethod_ID: paymentMethod.RowID,
+    Fix_OrderSendID: 1,
 
     Fix_OrderPaymentConfirmationStatus_ID:
       paymentMethod.EnName === "payInPlace" ? 2 : 1,

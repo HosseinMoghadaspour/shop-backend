@@ -503,17 +503,24 @@ export async function getOrderId(id: number, personId: number) {
     return { orderH: null, orderD: [] };
   }
 
-  const details = await prisma.orderD.findMany({
-    where: {
-      OrderH_ID: order.RowID,
-      InputValue: 0,
-    },
-    select: orderDetailSelect,
-  });
+  const [details, sendStatuses] = await Promise.all([
+    prisma.orderD.findMany({
+      where: {
+        OrderH_ID: order.RowID,
+        InputValue: 0,
+      },
+      select: orderDetailSelect,
+    }),
+    prisma.fix_OrderSendMethod.findMany({
+      orderBy: { RowID: "asc" },
+      select: { RowID: true, RowName: true },
+    }),
+  ]);
 
   return {
     orderH: serializeOrderHeader(order),
     orderD: details.map(serializeOrderDetail),
+    sendStatuses,
   };
 }
 

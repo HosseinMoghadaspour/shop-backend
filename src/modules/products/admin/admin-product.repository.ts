@@ -46,6 +46,9 @@ export async function findAdminProducts(filters: AdminProductFilters) {
         DiscountPrice: true,
         IsActive: true,
         IsShowInOnlineShop: true,
+        AmazingSale: true,
+        IsNewProduct: true,
+        IsBestSelling: true,
       },
       orderBy: { RowID: "desc" },
       skip,
@@ -88,6 +91,9 @@ export async function findAdminProducts(filters: AdminProductFilters) {
       discountPrice: product.DiscountPrice == null ? null : Number(product.DiscountPrice),
       isActive: product.IsActive,
       isVisible: product.IsShowInOnlineShop ?? false,
+      isAmazing: product.AmazingSale ?? false,
+      isNewProduct: product.IsNewProduct ?? false,
+      isBestSelling: product.IsBestSelling ?? false,
       images: (imagesByProduct.get(product.RowID) ?? []).map((image) => ({
         id: Number(image.RowID),
         url: image.ImageUrl,
@@ -115,5 +121,37 @@ export async function updateAdminProductVisibility(productId: number, isVisible:
     where: { RowID: productId },
     data: { IsShowInOnlineShop: isVisible },
     select: { RowID: true, IsShowInOnlineShop: true },
+  });
+}
+
+export type AdminProductSection = "amazing" | "new" | "bestSelling";
+
+export async function updateAdminProductSection(
+  productId: number,
+  section: AdminProductSection,
+  enabled: boolean,
+) {
+  const fieldBySection = {
+    amazing: "AmazingSale",
+    new: "IsNewProduct",
+    bestSelling: "IsBestSelling",
+  } as const;
+
+  const field = fieldBySection[section];
+  const existing = await prisma.good.findUnique({
+    where: { RowID: productId },
+    select: { RowID: true },
+  });
+  if (!existing) return null;
+
+  return prisma.good.update({
+    where: { RowID: productId },
+    data: { [field]: enabled },
+    select: {
+      RowID: true,
+      AmazingSale: true,
+      IsNewProduct: true,
+      IsBestSelling: true,
+    },
   });
 }

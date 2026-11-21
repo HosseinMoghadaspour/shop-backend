@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   findAdminProducts,
   updateAdminProductVisibility,
+  updateAdminProductSection,
 } from "./admin-product.repository.js";
 
 const listQuerySchema = z.object({
@@ -14,6 +15,11 @@ const listQuerySchema = z.object({
 
 const visibilitySchema = z.object({
   isVisible: z.boolean(),
+});
+
+const productSectionSchema = z.object({
+  section: z.enum(["amazing", "new", "bestSelling"]),
+  enabled: z.boolean(),
 });
 
 export async function listAdminProducts(c: Context) {
@@ -68,4 +74,50 @@ export async function changeProductVisibility(c: Context) {
       isVisible: product.IsShowInOnlineShop ?? false,
     },
   });
+}
+
+export async function changeProductSection(c: Context) {
+  const id = Number(c.req.param("id"));
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return c.json({ success: false, message: "شناسه کالا نامعتبر است." }, 400);
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ success: false, message: "بدنه درخواست JSON معتبر نیست." }, 400);
+  }
+
+  const parsed = productSectionSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, message: "بخش انتخاب‌شده یا وضعیت آن نامعتبر است." }, 400);
+  }
+
+  try {
+    const product = await updateAdminProductSection(
+      id,
+      parsed.data.section,
+      parsed.data.enabled,
+    );
+    if (!product) {
+      return c.json({ success: false, message: "کالا پیدا نشد." }, 404);
+    }
+
+    return c.json({
+      success: true,
+      message: "وضعیت بخش کالا بروزرسانی شد.",
+      data: {
+        id: product.RowID,
+        isAmazing: product.AmazingSale ?? false,
+        isNewProduct: product.IsNewProduct ?? false,
+        isBestSelling: product.IsBestSelling ?? false,
+      },
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      message: error instanceof Error ? error.message : "بروزرسانی بخش کالا ناموفق بود.",
+    }, 400);
+  }
 }

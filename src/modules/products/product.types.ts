@@ -25,6 +25,8 @@ export interface Product {
 
   isSpecialSale: boolean;
   amazingSale: boolean;
+  isNewProduct: boolean;
+  isBestSelling: boolean;
 
   minOrder: number | null;
   maxOrder: number | null;

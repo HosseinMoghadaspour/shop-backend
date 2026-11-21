@@ -74,6 +74,8 @@ model Good {
   ProducerPrice                                             Float?                     @db.Money
   LastPrice                                                 Float?                     @db.Money
   AmazingSale                                               Boolean?
+  IsNewProduct                                              Boolean                     @default(false, map: "DF_Good_IsNewProduct")
+  IsBestSelling                                             Boolean                     @default(false, map: "DF_Good_IsBestSelling")
   MinOrderSite                                              Decimal?                   @db.Decimal(18, 3)
   MaxOrderSite                                              Decimal?                   @db.Decimal(18, 3)
   MinSiteShow                                               Decimal?                   @db.Decimal(18, 3)

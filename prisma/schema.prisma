@@ -139,6 +139,7 @@ model Good {
 
   @@unique([RowCode, Fix_GoodType_ID], map: "UQ_Good_RowCode")
   @@index([IsActive, IsShowInOnlineShop, AmazingSale], map: "IX_Good_AmazingSale")
+  @@index([IsActive, IsShowInOnlineShop, IsNewProduct, IsBestSelling], map: "IX_Good_OnlineShopSections")
   @@index([Main_MeasureUnit_ID], map: "IX_Good_MainMeasureUnit")
   @@index([GoodCategory_ID, IsActive, IsShowInOnlineShop], map: "IX_Good_OnlineShop_Filter")
   @@index([Branch_ID], map: "NonClusteredIndex-20230917-174836")

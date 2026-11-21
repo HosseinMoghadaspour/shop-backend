@@ -131,13 +131,12 @@ export async function updateAdminProductSection(
   section: AdminProductSection,
   enabled: boolean,
 ) {
-  const fieldBySection = {
-    amazing: "AmazingSale",
-    new: "IsNewProduct",
-    bestSelling: "IsBestSelling",
-  } as const;
-
-  const field = fieldBySection[section];
+  const data: Prisma.GoodUpdateInput =
+    section === "amazing"
+      ? { AmazingSale: enabled }
+      : section === "new"
+        ? { IsNewProduct: enabled }
+        : { IsBestSelling: enabled };
   const existing = await prisma.good.findUnique({
     where: { RowID: productId },
     select: { RowID: true },
@@ -146,7 +145,7 @@ export async function updateAdminProductSection(
 
   return prisma.good.update({
     where: { RowID: productId },
-    data: { [field]: enabled },
+    data,
     select: {
       RowID: true,
       AmazingSale: true,

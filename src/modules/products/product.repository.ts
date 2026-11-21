@@ -42,6 +42,8 @@ const productSelect = {
   FullDescription: true,
   IsSpecialSale: true,
   AmazingSale: true,
+  IsNewProduct: true,
+  IsBestSelling: true,
   MinOrderSite: true,
   MaxOrderSite: true,
   MinSiteShow: true,
@@ -120,6 +122,8 @@ function mapProduct(product: ProductRow): PublicProductBase {
     description: product.RowDesc,
     isSpecialSale: product.IsSpecialSale ?? false,
     amazingSale: product.AmazingSale ?? false,
+    isNewProduct: product.IsNewProduct ?? false,
+    isBestSelling: product.IsBestSelling ?? false,
     minOrder: decimalToNumber(product.MinOrderSite),
     maxOrder: decimalToNumber(product.MaxOrderSite),
     minShow: decimalToNumber(product.MinSiteShow),
@@ -467,9 +471,9 @@ export async function getAmazingProducts(limit = 12, options: Pick<ProductFilter
 
 export async function getNewProducts(limit = 12, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {
   const products = await prisma.good.findMany({
-    where: { IsActive: true, IsShowInOnlineShop: true, MDate: { not: null } },
+    where: { IsActive: true, IsShowInOnlineShop: true, IsNewProduct: true },
     select: productSelect,
-    orderBy: [{ MDate: "desc" }, { RowID: "desc" }],
+    orderBy: { RowID: "desc" },
     take: limit,
   });
   const pricing = await resolveProductsPricing(products, options);
@@ -483,18 +487,16 @@ export async function getNewProducts(limit = 12, options: Pick<ProductFilters, "
 }
 
 export async function findBestSellingProductIds(limit = 12): Promise<number[]> {
-  const sales = await prisma.orderD.groupBy({
-    by: ["Good_ID"],
+  const products = await prisma.good.findMany({
     where: {
-      order: { IsOnlineOrder: true },
-      good: { IsActive: true, IsShowInOnlineShop: true },
+      IsActive: true,
+      IsShowInOnlineShop: true,
+      IsBestSelling: true,
     },
-    _sum: { OutputValue: true },
-    orderBy: { _sum: { OutputValue: "desc" } },
+    select: { RowID: true },
+    orderBy: { RowID: "desc" },
     take: limit,
   });
 
-  return sales
-    .filter((sale) => sale.Good_ID !== null && sale.Good_ID !== undefined)
-    .map((sale) => Number(sale.Good_ID));
+  return products.map((product) => product.RowID);
 }

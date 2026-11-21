@@ -3,6 +3,7 @@ import { requireAdminAuth } from "../../../middleware/auth.middleware.js";
 import {
   listAdminProducts,
   changeProductVisibility,
+  changeProductSection,
 } from "./admin-product.controller.js";
 import {
   uploadImages,
@@ -22,6 +23,12 @@ adminProductRoutes.patch(
   "/:id/visibility",
   requireAdminAuth,
   changeProductVisibility,
+);
+
+adminProductRoutes.patch(
+  "/:id/sections",
+  requireAdminAuth,
+  changeProductSection,
 );
 
 adminProductRoutes.post(

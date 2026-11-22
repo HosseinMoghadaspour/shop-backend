@@ -5,6 +5,7 @@ import {
   getBestSellingProducts,
   getProductByCode,
   getProductById,
+  getSimilarProducts,
   getProducts,
 } from "./product.service.js";
 import { productLimitSchema, productQuerySchema } from "./product.schema.js";
@@ -37,6 +38,19 @@ export async function showProduct(c: Context) {
     return c.json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: "کالا پیدا نشد" } }, 404);
   }
   return c.json({ success: true, data: product });
+}
+
+export async function showSimilarProducts(c: Context) {
+  const id = Number(c.req.param("id"));
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return c.json({ success: false, error: { code: "INVALID_PRODUCT_ID", message: "شناسه کالا نامعتبر است" } }, 400);
+  }
+  const rawLimit = c.req.query("limit");
+  const limit = rawLimit == null ? 10 : Number(rawLimit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
+    return c.json({ success: false, error: { code: "INVALID_LIMIT", message: "مقدار limit نامعتبر است" } }, 400);
+  }
+  return c.json({ success: true, data: await getSimilarProducts(id, limit, priceOptions(c)) });
 }
 
 export async function showProductByCode(c: Context) {

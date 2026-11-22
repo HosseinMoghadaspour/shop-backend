@@ -5,6 +5,7 @@ import {
   listBestSellingProducts,
   listProducts,
   showProduct,
+  showSimilarProducts,
   showProductByCode,
 } from "./product.controller.js";
 
@@ -15,4 +16,5 @@ productRoutes.get("/amazing", listAmazingProducts);
 productRoutes.get("/new", listNewProducts);
 productRoutes.get("/best-selling", listBestSellingProducts);
 productRoutes.get("/code/:code", showProductByCode);
+productRoutes.get("/:id/similar", showSimilarProducts);
 productRoutes.get("/:id", showProduct);

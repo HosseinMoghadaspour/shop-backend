@@ -1,5 +1,6 @@
 import {
   findProductByCode,
+  findSimilarProducts,
   findProductById,
   findProducts,
   getAmazingProducts as findAmazingProducts,
@@ -23,6 +24,10 @@ export async function getProducts(filters: ProductFilters) {
 
 export function getProductById(id: number, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {
   return findProductById(id, options);
+}
+
+export function getSimilarProducts(id: number, limit = 10, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {
+  return findSimilarProducts(id, limit, options);
 }
 
 export function getProductByCode(code: string, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {

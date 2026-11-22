@@ -470,12 +470,35 @@ export async function getAmazingProducts(limit = 12, options: Pick<ProductFilter
 }
 
 export async function getNewProducts(limit = 12, options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {}) {
+  // Automatically include the most recently registered products. IsNewProduct
+  // remains a manual pin so admins can additionally feature older products.
+  const [automaticProducts, manuallySelectedProducts] = await Promise.all([
+    prisma.good.findMany({
+      where: { IsActive: true, IsShowInOnlineShop: true },
+      select: { RowID: true },
+      orderBy: [{ InsertServerDateTime: "desc" }, { RowID: "desc" }],
+      take: limit,
+    }),
+    prisma.good.findMany({
+      where: { IsActive: true, IsShowInOnlineShop: true, IsNewProduct: true },
+      select: { RowID: true },
+      orderBy: [{ InsertServerDateTime: "desc" }, { RowID: "desc" }],
+    }),
+  ]);
+
+  const ids = [...new Set([
+    ...manuallySelectedProducts.map((product) => product.RowID),
+    ...automaticProducts.map((product) => product.RowID),
+  ])].slice(0, limit);
+  if (ids.length === 0) return [];
+
   const products = await prisma.good.findMany({
-    where: { IsActive: true, IsShowInOnlineShop: true, IsNewProduct: true },
+    where: { RowID: { in: ids }, IsActive: true, IsShowInOnlineShop: true },
     select: productSelect,
-    orderBy: { RowID: "desc" },
-    take: limit,
   });
+  const order = new Map(ids.map((id, index) => [id, index]));
+  products.sort((a, b) => (order.get(a.RowID) ?? 0) - (order.get(b.RowID) ?? 0));
+
   const pricing = await resolveProductsPricing(products, options);
   return Promise.all(products.map(async (product) => {
     const [images, stockInfo] = await Promise.all([
@@ -486,17 +509,42 @@ export async function getNewProducts(limit = 12, options: Pick<ProductFilters, "
   }));
 }
 
-export async function findBestSellingProductIds(limit = 12): Promise<number[]> {
-  const products = await prisma.good.findMany({
-    where: {
-      IsActive: true,
-      IsShowInOnlineShop: true,
-      IsBestSelling: true,
-    },
-    select: { RowID: true },
-    orderBy: { RowID: "desc" },
-    take: limit,
-  });
 
-  return products.map((product) => product.RowID);
+export async function findBestSellingProductIds(limit = 12): Promise<number[]> {
+  // Rank by the quantity sold in registered orders, not by the manual flag.
+  // InputValue=0 identifies outgoing order-detail rows in this application.
+  const [sales, manuallySelectedProducts] = await Promise.all([
+    prisma.$queryRaw<Array<{ Good_ID: number }>>(Prisma.sql`
+      SELECT TOP (${limit}) detail.Good_ID
+      FROM dbo.OrderD AS detail
+      INNER JOIN dbo.OrderH AS header
+        ON header.RowID = detail.OrderH_ID
+      INNER JOIN dbo.Good AS good
+        ON good.RowID = detail.Good_ID
+      WHERE detail.InputValue = 0
+        AND detail.Good_ID IS NOT NULL
+        AND header.OrderStatus = 1
+        AND good.IsActive = 1
+        AND good.IsShowInOnlineShop = 1
+      GROUP BY detail.Good_ID
+      ORDER BY SUM(COALESCE(detail.OutputValue, 0)) DESC,
+               MAX(header.MDate) DESC,
+               detail.Good_ID DESC
+    `),
+    prisma.good.findMany({
+      where: {
+        IsActive: true,
+        IsShowInOnlineShop: true,
+        IsBestSelling: true,
+      },
+      select: { RowID: true },
+      orderBy: [{ InsertServerDateTime: "desc" }, { RowID: "desc" }],
+    }),
+  ]);
+
+  // Keep IsBestSelling as a manual pin, including products with no sales yet.
+  return [...new Set([
+    ...manuallySelectedProducts.map((product) => product.RowID),
+    ...sales.map((product) => Number(product.Good_ID)),
+  ])].slice(0, limit);
 }

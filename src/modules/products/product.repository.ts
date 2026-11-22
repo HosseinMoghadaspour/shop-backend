@@ -496,8 +496,14 @@ export async function getNewProducts(limit = 12, options: Pick<ProductFilters, "
     where: { RowID: { in: ids }, IsActive: true, IsShowInOnlineShop: true },
     select: productSelect,
   });
-  const order = new Map(ids.map((id, index) => [id, index]));
-  products.sort((a, b) => (order.get(a.RowID) ?? 0) - (order.get(b.RowID) ?? 0));
+  // Manual additions join the automatic list, but the final display order
+  // always remains registration-date descending.
+  products.sort((a, b) => {
+    const dateDifference =
+      (b.InsertServerDateTime?.getTime() ?? 0) -
+      (a.InsertServerDateTime?.getTime() ?? 0);
+    return dateDifference || b.RowID - a.RowID;
+  });
 
   const pricing = await resolveProductsPricing(products, options);
   return Promise.all(products.map(async (product) => {
@@ -511,40 +517,46 @@ export async function getNewProducts(limit = 12, options: Pick<ProductFilters, "
 
 
 export async function findBestSellingProductIds(limit = 12): Promise<number[]> {
-  // Rank by the quantity sold in registered orders, not by the manual flag.
-  // InputValue=0 identifies outgoing order-detail rows in this application.
-  const [sales, manuallySelectedProducts] = await Promise.all([
-    prisma.$queryRaw<Array<{ Good_ID: number }>>(Prisma.sql`
-      SELECT TOP (${limit}) detail.Good_ID
-      FROM dbo.OrderD AS detail
-      INNER JOIN dbo.OrderH AS header
-        ON header.RowID = detail.OrderH_ID
-      INNER JOIN dbo.Good AS good
-        ON good.RowID = detail.Good_ID
-      WHERE detail.InputValue = 0
-        AND detail.Good_ID IS NOT NULL
-        AND header.OrderStatus = 1
-        AND good.IsActive = 1
-        AND good.IsShowInOnlineShop = 1
-      GROUP BY detail.Good_ID
-      ORDER BY SUM(COALESCE(detail.OutputValue, 0)) DESC,
-               MAX(header.MDate) DESC,
-               detail.Good_ID DESC
-    `),
-    prisma.good.findMany({
-      where: {
-        IsActive: true,
-        IsShowInOnlineShop: true,
-        IsBestSelling: true,
-      },
-      select: { RowID: true },
-      orderBy: [{ InsertServerDateTime: "desc" }, { RowID: "desc" }],
-    }),
-  ]);
+  // Manual additions are appended after the sales-ranked products so the
+  // automatically ranked portion always keeps its real order statistics.
+  const manuallySelectedProducts = await prisma.good.findMany({
+    where: {
+      IsActive: true,
+      IsShowInOnlineShop: true,
+      IsBestSelling: true,
+    },
+    select: { RowID: true },
+    orderBy: [{ InsertServerDateTime: "desc" }, { RowID: "desc" }],
+    take: limit,
+  });
+  const manualIds = manuallySelectedProducts.map((product) => product.RowID);
+  const automaticLimit = Math.max(0, limit - manualIds.length);
 
-  // Keep IsBestSelling as a manual pin, including products with no sales yet.
-  return [...new Set([
-    ...manuallySelectedProducts.map((product) => product.RowID),
-    ...sales.map((product) => Number(product.Good_ID)),
-  ])].slice(0, limit);
+  const sales = automaticLimit > 0
+    ? await prisma.$queryRaw<Array<{ Good_ID: number }>>(Prisma.sql`
+        SELECT TOP (${limit}) detail.Good_ID
+        FROM dbo.OrderD AS detail
+        INNER JOIN dbo.OrderH AS header
+          ON header.RowID = detail.OrderH_ID
+        INNER JOIN dbo.Good AS good
+          ON good.RowID = detail.Good_ID
+        WHERE detail.InputValue = 0
+          AND detail.Good_ID IS NOT NULL
+          AND header.OrderStatus = 1
+          AND good.IsActive = 1
+          AND good.IsShowInOnlineShop = 1
+        GROUP BY detail.Good_ID
+        ORDER BY SUM(COALESCE(detail.OutputValue, 0)) DESC,
+                 MAX(header.MDate) DESC,
+                 detail.Good_ID DESC
+      `)
+    : [];
+
+  const manualSet = new Set(manualIds);
+  const automaticIds = sales
+    .map((product) => Number(product.Good_ID))
+    .filter((id) => !manualSet.has(id))
+    .slice(0, automaticLimit);
+
+  return [...automaticIds, ...manualIds].slice(0, limit);
 }

@@ -534,7 +534,7 @@ export async function findBestSellingProductIds(limit = 12): Promise<number[]> {
 
   const sales = automaticLimit > 0
     ? await prisma.$queryRaw<Array<{ Good_ID: number }>>(Prisma.sql`
-        SELECT TOP (${limit}) detail.Good_ID
+        SELECT TOP (${limit + manualIds.length}) detail.Good_ID
         FROM dbo.OrderD AS detail
         INNER JOIN dbo.OrderH AS header
           ON header.RowID = detail.OrderH_ID

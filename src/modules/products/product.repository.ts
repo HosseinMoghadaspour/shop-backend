@@ -433,6 +433,69 @@ export async function findProductById(
   return { ...mapProduct(product), pricing, images, stockInfo };
 }
 
+export async function findSimilarProducts(
+  productId: number,
+  limit = 10,
+  options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {},
+): Promise<Product[]> {
+  const current = await prisma.good.findFirst({
+    where: { RowID: productId, IsActive: true, IsShowInOnlineShop: true },
+    select: { RowID: true, RowName: true, RowNameAlias: true, RowNameEN: true, GoodCategory_ID: true, BrandID: true },
+  });
+  if (!current) return [];
+
+  const stopWords = new Set(["برای", "با", "از", "در", "و", "یا", "the", "and", "for"]);
+  const tokens = [...new Set(
+    [current.RowName, current.RowNameAlias, current.RowNameEN]
+      .filter((value): value is string => Boolean(value))
+      .join(" ")
+      .toLocaleLowerCase("fa-IR")
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 2 && !stopWords.has(token)),
+  )].slice(0, 8);
+
+  const candidates = await prisma.good.findMany({
+    where: {
+      RowID: { not: productId },
+      IsActive: true,
+      IsShowInOnlineShop: true,
+      OR: [
+        ...(tokens.length ? tokens.flatMap((token) => [
+          { RowName: { contains: token } },
+          { RowNameAlias: { contains: token } },
+          { RowNameEN: { contains: token } },
+        ]) : []),
+        ...(current.GoodCategory_ID != null ? [{ GoodCategory_ID: current.GoodCategory_ID }] : []),
+        ...(current.BrandID != null ? [{ BrandID: current.BrandID }] : []),
+      ],
+    },
+    select: productSelect,
+    orderBy: [{ InsertServerDateTime: "desc" }, { RowID: "desc" }],
+    take: 60,
+  });
+
+  const normalize = (value: string | null | undefined) =>
+    (value ?? "").toLocaleLowerCase("fa-IR").replace(/[^\p{L}\p{N}\s]/gu, " ");
+  const currentTokens = new Set(tokens);
+  const ranked = candidates.map((candidate) => {
+    const candidateTokens = new Set(
+      normalize([candidate.RowName, candidate.RowNameAlias, candidate.RowNameEN].filter(Boolean).join(" "))
+        .split(/\s+/).filter((token) => token.length >= 2),
+    );
+    let score = 0;
+    for (const token of currentTokens) if (candidateTokens.has(token)) score += 3;
+    if (current.GoodCategory_ID != null && candidate.GoodCategory_ID === current.GoodCategory_ID) score += 2;
+    if (current.BrandID != null && candidate.BrandID === current.BrandID) score += 1;
+    return { id: candidate.RowID, score, createdAt: candidate.InsertServerDateTime?.getTime() ?? 0 };
+  }).sort((a, b) => b.score - a.score || b.createdAt - a.createdAt || b.id - a.id);
+
+  const ids = ranked.slice(0, limit).map((item) => item.id);
+  const products = await Promise.all(ids.map((id) => findProductById(id, options)));
+  return products.filter((product): product is Product => product !== null);
+}
+
 export async function findProductByCode(
   code: string,
   options: Pick<ProductFilters, "branchId" | "salePriceTypeId"> = {},

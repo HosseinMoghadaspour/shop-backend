@@ -1,9 +1,5 @@
 import type { ProductPricing } from "./price.types.js";
-import {
-  findBranchSalePriceType,
-  findMainBranch,
-  findSalePrices,
-} from "./price.repository.js";
+import { findBranchPrices } from "./price.repository.js";
 
 type ProductPriceBase = {
   RowID: number;
@@ -14,7 +10,7 @@ type ProductPriceBase = {
 
 type PricingOptions = {
   branchId?: number;
-  /** Kept for API compatibility. The authoritative value is always read from SiteBranchConfig. */
+  /** Retained for API compatibility; storefront pricing does not use price-type IDs. */
   salePriceTypeId?: number;
 };
 
@@ -36,7 +32,6 @@ function buildPricing(
     salePrice: number;
     consumerPrice: number | null;
     branchId: number | null;
-    priceType: ProductPricing["priceType"];
   },
 ): ProductPricing {
   const salePrice = values.salePrice;
@@ -58,22 +53,15 @@ function buildPricing(
       ? Number((((salePrice - finalPrice) / salePrice) * 100).toFixed(2))
       : null,
     branchId: values.branchId,
-    priceType: values.priceType,
+    priceType: null,
   };
 }
 
-function buildGlobalPricing(base: ProductPriceBase): ProductPricing {
-  return buildPricing(base, {
-    salePrice: Number(base.SalePrice ?? 0),
-    consumerPrice: base.ConsumerPrice == null ? null : Number(base.ConsumerPrice),
-    branchId: null,
-    priceType: null,
-  });
-}
-
 /**
- * Resolve storefront prices from the sale-price type configured for the selected
- * branch. The client-provided salePriceTypeId is deliberately not trusted.
+ * Storefront products are selected by branchId.
+ * A branch-specific GoodBranchPrice overrides the regular Good price when
+ * a valid branch price exists. Otherwise the product's own SalePrice is used.
+ * This deliberately has no dependency on SalePriceType or SiteBranchConfig.SalePriceType_ID.
  */
 export async function resolveProductsPricing(
   products: ProductPriceBase[],
@@ -81,60 +69,48 @@ export async function resolveProductsPricing(
 ): Promise<Map<number, ProductPricing>> {
   if (products.length === 0) return new Map();
 
-  let branchId = options.branchId;
-  if (branchId == null) {
-    branchId = (await findMainBranch())?.id;
-  }
+  const branchId =
+    options.branchId != null && Number.isSafeInteger(options.branchId) && options.branchId > 0
+      ? options.branchId
+      : null;
 
-  // Legacy fallback is retained only when no online-store branch is configured.
-  if (branchId == null) {
-    return new Map(products.map((product) => [
-      product.RowID,
-      buildGlobalPricing(product),
-    ]));
-  }
-
-  const salePriceTypeId = await findBranchSalePriceType(branchId);
-  if (salePriceTypeId == null) {
-    throw new Error(
-      `نوع قیمت فروش برای شعبه ${branchId} در تنظیمات فروشگاه تعریف نشده است.`,
-    );
-  }
-
-  const rows = await findSalePrices(
-    products.map((product) => product.RowID),
-    salePriceTypeId,
+  const branchPrices = branchId == null
+    ? []
+    : await findBranchPrices(
+        products.map((product) => product.RowID),
+        branchId,
+      );
+  const branchPricesByGoodId = new Map(
+    branchPrices.map((row) => [row.goodId, row]),
   );
-  const pricesByGoodId = new Map(rows.map((row) => [row.goodId, row]));
 
   const result = new Map<number, ProductPricing>();
   for (const product of products) {
-    const row = pricesByGoodId.get(product.RowID);
-    if (!row || row.salePrice == null || !Number.isFinite(row.salePrice)) {
-      throw new Error(
-        `قیمت کالا با شناسه ${product.RowID} برای نوع قیمت شعبه انتخاب‌شده تعریف نشده است.`,
-      );
-    }
+    const branchPrice = branchPricesByGoodId.get(product.RowID);
+    const branchSalePrice =
+      branchPrice?.salePrice != null &&
+      Number.isFinite(branchPrice.salePrice) &&
+      branchPrice.salePrice > 0
+        ? branchPrice.salePrice
+        : null;
 
-    if (row.branchId != null && row.branchId !== branchId) {
-      throw new Error(
-        `نوع قیمت کالا ${product.RowID} متعلق به شعبه انتخاب‌شده نیست.`,
-      );
-    }
+    const salePrice = branchSalePrice ?? Number(product.SalePrice ?? 0);
+    const consumerPrice =
+      branchPrice?.consumerPrice != null &&
+      Number.isFinite(branchPrice.consumerPrice)
+        ? branchPrice.consumerPrice
+        : product.ConsumerPrice == null
+          ? null
+          : Number(product.ConsumerPrice);
 
-    result.set(product.RowID, buildPricing(product, {
-      salePrice: Number(row.salePrice),
-      consumerPrice: row.consumerPrice == null
-        ? (product.ConsumerPrice == null ? null : Number(product.ConsumerPrice))
-        : Number(row.consumerPrice),
-      branchId,
-      priceType: {
-        id: row.salePriceTypeId,
-        name: row.salePriceTypeName,
-        salePrice: Number(row.salePrice),
-        consumerPrice: row.consumerPrice == null ? null : Number(row.consumerPrice),
-      },
-    }));
+    result.set(
+      product.RowID,
+      buildPricing(product, {
+        salePrice,
+        consumerPrice,
+        branchId,
+      }),
+    );
   }
 
   return result;

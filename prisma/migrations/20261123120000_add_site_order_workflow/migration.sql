@@ -18,3 +18,19 @@ BEGIN
   CREATE INDEX IX_SiteOrderWorkflow_Status_CreatedAt
     ON dbo.SiteOrderWorkflow(Status, CreatedAt DESC);
 END;
+
+-- Keep legacy online orders usable after the workflow is introduced.
+-- New orders receive Status=1 from the application; historical orders already
+-- passed checkout and therefore continue from the payment step.
+INSERT INTO dbo.SiteOrderWorkflow (OrderH_ID, Status, ShippingCost)
+SELECT
+  oh.RowID,
+  CASE WHEN oh.Fix_OrderPaymentConfirmationStatus_ID = 3 THEN 4 ELSE 3 END,
+  ISNULL(oh.ShippingCost, 0)
+FROM dbo.OrderH oh
+WHERE oh.IsOnlineOrder = 1
+  AND NOT EXISTS (
+    SELECT 1
+    FROM dbo.SiteOrderWorkflow workflow
+    WHERE workflow.OrderH_ID = oh.RowID
+  );

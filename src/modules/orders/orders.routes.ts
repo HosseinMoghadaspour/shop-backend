@@ -13,6 +13,7 @@ import {
   createOrderRequestController,
   listCustomerOrderRequestsController,
 } from "./order-requests.controller.js";
+import { confirmCustomerOrderTotalController } from "./order-workflow.controller.js";
 
 export const ordersRoutes =
   new Hono();
@@ -31,6 +32,7 @@ ordersRoutes.get(
 );
 
 ordersRoutes.post("/:id/requests", requireShopAuth, createOrderRequestController);
+ordersRoutes.post("/:id/confirm-total", requireShopAuth, confirmCustomerOrderTotalController);
 ordersRoutes.get("/:id/requests", requireShopAuth, listCustomerOrderRequestsController);
 
 ordersRoutes.get(

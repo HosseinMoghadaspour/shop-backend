@@ -1,3 +1,4 @@
+import { createWarehouseDocumentForPaidOrder } from "../../orders/orders.service.js";
 import { prisma } from "../../../lib/prisma.js";
 
 const PAYMENT_STATUS = {
@@ -268,8 +269,12 @@ export async function approvePaymentReceipt(orderId: bigint) {
       );
     }
 
+    // پرداخت تأیید شد؛ اکنون و در همین تراکنش سند انبار صادر می‌شود.
+    const warehouseDocument = await createWarehouseDocumentForPaidOrder(tx, order.RowID);
+
     return {
       orderId: order.RowID.toString(),
+      warehouseDocumentId: warehouseDocument.whDocHId.toString(),
       paymentStatusId: PAYMENT_STATUS.PAID,
       message: "رسید با موفقیت تأیید شد.",
     };

@@ -313,6 +313,7 @@ export async function startPayment(
           RowName: true,
         },
       },
+      SiteOrderWorkflow: { select: { Status: true } },
     },
   });
 
@@ -320,6 +321,10 @@ export async function startPayment(
     throw new Error(
       "سفارش پیدا نشد یا متعلق به این مشتری نیست.",
     );
+  }
+
+  if (order.SiteOrderWorkflow?.Status !== 3) {
+    throw new Error("ابتدا باید هزینه ارسال سفارش را تأیید کنید.");
   }
 
   if (!order.Fix_OrderPaymentMethod_ID) {
@@ -578,11 +583,16 @@ export async function submitCardToCardReceipt(
           IsActive: true,
         },
       },
+      SiteOrderWorkflow: { select: { Status: true } },
     },
   });
 
   if (!order) {
     throw new Error("سفارش پیدا نشد یا متعلق به این مشتری نیست.");
+  }
+
+  if (order.SiteOrderWorkflow?.Status !== 3) {
+    throw new Error("ابتدا باید مبلغ نهایی سفارش را تأیید کنید.");
   }
 
   if (

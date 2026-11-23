@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
-import { resolveProductPricing } from "../pricing/price.service.js";
+import { resolveProductsPricing } from "../pricing/price.service.js";
 import { getProductStockQuantityForBranch } from "../products/product.repository.js";
 import type {
   CartItem,
@@ -232,6 +232,7 @@ async function buildCartResponse(
   );
 
 
+  const pricingByGoodId = await resolveProductsPricing(goods, { branchId });
   const responseItems: CartItemResponse[] = [];
 
   for (const item of cart.items) {
@@ -249,7 +250,7 @@ async function buildCartResponse(
       continue;
     }
 
-    const pricing = await resolveProductPricing(good);
+    const pricing = pricingByGoodId.get(good.RowID)!;
     const unitPrice = pricing.finalPrice;
 
     responseItems.push({

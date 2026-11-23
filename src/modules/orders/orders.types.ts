@@ -30,7 +30,7 @@ export interface OrderItemResponse {
 }
 
 export type OrderResponse = {
-  whDocHId: number;
+  whDocHId: number | null;
   whDocD: number;
   orderHId: number;
   orderD: number;

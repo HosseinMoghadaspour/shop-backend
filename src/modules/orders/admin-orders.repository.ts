@@ -195,6 +195,10 @@ export async function updateAdminOrderStatuses(
       if (!status) return { kind: "invalid-send-status" as const };
     }
 
+    if (paymentStatusId === 3) {
+      return { kind: "payment-requires-verification" as const };
+    }
+
     if (paymentStatusId !== undefined) {
       const status = await tx.fix_OrderPaymentConfirmationStatus.findUnique({
         where: { RowID: paymentStatusId },

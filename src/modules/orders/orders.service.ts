@@ -215,6 +215,10 @@ export async function createWarehouseDocumentForPaidOrder(
     select: { RowID: true },
   });
   if (existing) {
+    await tx.siteOrderWorkflow.updateMany({
+      where: { OrderH_ID: orderId, Status: 3 },
+      data: { Status: 4, UpdatedAt: new Date() },
+    });
     return {
       whDocHId: existing.RowID,
       whDocD: await tx.whDocD.count({ where: { WhDocH_ID: existing.RowID } }),

@@ -28,6 +28,7 @@ import { adminFooterRoutes } from "../modules/footer/admin-footer.routes.js";
 import { adminBankAccountsRoutes } from "../modules/admin/bank-accounts/bank-accounts.routes.js";
 import { adminPaymentReceiptsRoutes } from "../modules/admin/payment-receipts/payment-receipts.routes.js";
 import { adminPaymentMethodsRoutes } from "../modules/admin/payment-methods/payment-methods.routes.js";
+import { adminOrderWorkflowRoutes } from "../modules/orders/order-workflow.admin-routes.js";
 
 type RouteEnv = {
   Variables: {
@@ -93,6 +94,7 @@ routes.route("/branches", branchRoutes);
 routes.route("/payment", paymentRoutes);
 routes.route("/admin/products", adminProductRoutes);
 routes.route("/admin/orders", adminOrdersRoutes);
+routes.route("/admin/orders", adminOrderWorkflowRoutes);
 routes.route("/admin/order-requests", adminOrderRequestRoutes);
 routes.route("/admin/categories", adminCategoryRoutes)
 routes.route("/admin/dashboard", adminDashboardRoutes);

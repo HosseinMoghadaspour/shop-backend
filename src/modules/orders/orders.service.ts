@@ -557,9 +557,18 @@ const orderHeaderSelect = {
   DiscountPercent: true,
   DiscountPrice: true,
   PayablePrice: true,
+  ShippingCost: true,
   TaxPercent: true,
   TaxPrice:true,
   OrderStatus: true,
+  SiteOrderWorkflow: {
+    select: {
+      Status: true,
+      ShippingCost: true,
+      AdminNote: true,
+      QuoteExpiresAt: true,
+    },
+  },
   Fix_OrderDeliveryStatus: { select: { RowName: true } },
   Fix_OrderSendMethod: { select: { RowID: true, RowName: true } },
   Fix_OrderPaymentConfirmationStatus: { select: { RowName: true } },
@@ -600,6 +609,14 @@ function serializeOrderHeader<T extends { RowID: bigint; DocNo: bigint }>(
     SendStatusId: (order as T & { Fix_OrderSendMethod?: { RowID: number; RowName: string | null } | null }).Fix_OrderSendMethod?.RowID ?? null,
     SendStatusName: (order as T & { Fix_OrderSendMethod?: { RowID: number; RowName: string | null } | null }).Fix_OrderSendMethod?.RowName ?? null,
     PaymentStatusName: (order as T & { Fix_OrderPaymentConfirmationStatus?: { RowName: string } | null }).Fix_OrderPaymentConfirmationStatus?.RowName ?? null,
+    WorkflowStatusId: (order as T & { SiteOrderWorkflow?: { Status: number } | null }).SiteOrderWorkflow?.Status ?? null,
+    ShippingQuote: (order as T & { SiteOrderWorkflow?: { ShippingCost: number | null; AdminNote: string | null; QuoteExpiresAt: Date | null } | null }).SiteOrderWorkflow
+      ? {
+          shippingCost: (order as T & { SiteOrderWorkflow: { ShippingCost: number | null } }).SiteOrderWorkflow.ShippingCost,
+          adminNote: (order as T & { SiteOrderWorkflow: { AdminNote: string | null } }).SiteOrderWorkflow.AdminNote,
+          expiresAt: (order as T & { SiteOrderWorkflow: { QuoteExpiresAt: Date | null } }).SiteOrderWorkflow.QuoteExpiresAt,
+        }
+      : null,
   };
 }
 

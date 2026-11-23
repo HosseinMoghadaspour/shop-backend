@@ -196,12 +196,147 @@ async function getNextDocNoWhDocH(
   const result = await tx.$queryRaw<
     { NextDocNo: bigint }[]
   >`
-    SELECT
-      ISNULL(MAX(DocNo), 0) + 1 AS NextDocNo
+    SELECT ISNULL(MAX(DocNo), 0) + 1 AS NextDocNo
     FROM dbo.WhDocH WITH (UPDLOCK, HOLDLOCK)
   `;
-
   return result[0]?.NextDocNo ?? 1n;
+}
+
+/**
+ * سند انبار فقط پس از احراز پرداخت ساخته می‌شود.
+ * وجود سند قبلی، عملیات را idempotent می‌کند.
+ */
+export async function createWarehouseDocumentForPaidOrder(
+  tx: Prisma.TransactionClient,
+  orderId: bigint,
+) {
+  const existing = await tx.whDocH.findFirst({
+    where: { OrderH_ID: orderId },
+    select: { RowID: true },
+  });
+  if (existing) {
+    return {
+      whDocHId: existing.RowID,
+      whDocD: await tx.whDocD.count({ where: { WhDocH_ID: existing.RowID } }),
+    };
+  }
+
+  const order = await tx.orderH.findUnique({
+    where: { RowID: orderId },
+    select: {
+      RowID: true, Branch_ID: true, FinancialYear_ID: true,
+      Person_ID: true, TotalPrice: true, DiscountPrice: true,
+      TaxPrice: true, PayablePrice: true, ShippingCost: true,
+      RowDesc: true, Fix_OrderPaymentConfirmationStatus_ID: true,
+      orderDetails: {
+        where: { InputValue: 0 },
+        select: {
+          Branch_ID: true, FinancialYear_ID: true, Good_ID: true,
+          InputValue: true, CalculatedInputValue: true,
+          OutputValue: true, CalculatedOutputValue: true,
+          UnitPrice: true, TotalPrice: true, DiscountPrice: true,
+          DiscountPercent: true, PurchaseUnitPrice: true,
+          PurchaseTotalPrice: true, TaxPercent: true, TaxPrice: true,
+          SaleUnitPrice: true, MeasureUnit_ID: true,
+          Main_MeasureUnit_ID: true, Fix_DiscountType_ID: true,
+        },
+      },
+    },
+  });
+  if (!order) throw new Error("سفارش برای صدور سند انبار پیدا نشد.");
+  if (order.Fix_OrderPaymentConfirmationStatus_ID !== 3) {
+    throw new Error("صدور سند انبار فقط پس از تأیید پرداخت امکان‌پذیر است.");
+  }
+  if (!order.Branch_ID || order.orderDetails.length === 0) {
+    throw new Error("اطلاعات شعبه یا اقلام سفارش برای صدور سند انبار ناقص است.");
+  }
+
+  const configs = await tx.$queryRaw<Array<{ Warehouse_ID: number }>>(Prisma.sql`
+    SELECT Warehouse_ID
+    FROM dbo.SiteBranchConfig
+    WHERE Branch_ID = ${order.Branch_ID} AND IsActive = 1
+      AND Warehouse_ID IS NOT NULL
+  `);
+  const warehouseId = Number(configs[0]?.Warehouse_ID);
+  if (!Number.isSafeInteger(warehouseId) || warehouseId <= 0) {
+    throw new Error("انبار فعال شعبه سفارش مشخص نشده است.");
+  }
+
+  await checkStockForOrder(
+    tx,
+    warehouseId,
+    order.FinancialYear_ID,
+    order.orderDetails.map((item) => ({
+      goodId: item.Good_ID,
+      quantity: Number(item.OutputValue),
+    })),
+  );
+
+  const docNo = await getNextDocNoWhDocH(tx);
+  const whDocH = await tx.whDocH.create({
+    data: {
+      DocNo: docNo,
+      UniqueCode: randomUUID(),
+      Person_ID: order.Person_ID,
+      MDate: new Date(),
+      FDate: getJalaliDate(),
+      FDateInsert: getJalaliDate(),
+      FTimeInsert: getCurrentTime(),
+      TotalPrice: order.TotalPrice ?? 0,
+      FinancialYear_ID: order.FinancialYear_ID,
+      TotalDiscountPriceItems: 0,
+      TotalTaxPriceItems: 0,
+      TotalIncreasePrice: 1,
+      TotalDecreasePrice: 0,
+      Branch_ID: order.Branch_ID,
+      DiscountPercent: 0,
+      DiscountPrice: order.DiscountPrice ?? 0,
+      TaxPercent: 0,
+      TaxPrice: order.TaxPrice ?? 0,
+      PayablePrice: order.PayablePrice ?? 0,
+      Fix_DiscountType_ID: 1,
+      Fix_RecordStatusType_ID: 1,
+      Fix_WhDocType1_ID: 1,
+      Fix_WhDocType2_ID: 1,
+      Warehouse_ID: warehouseId,
+      RowDesc: order.RowDesc,
+      RowUpdateVersion: 1,
+      OrderH_ID: order.RowID,
+    },
+    select: { RowID: true },
+  });
+
+  const created = await tx.whDocD.createMany({
+    data: order.orderDetails.map((item) => ({
+      Branch_ID: item.Branch_ID,
+      FinancialYear_ID: item.FinancialYear_ID,
+      WhDocH_ID: whDocH.RowID,
+      Good_ID: item.Good_ID,
+      InputValue: item.InputValue,
+      CalculatedInputValue: item.CalculatedInputValue,
+      OutputValue: item.OutputValue,
+      CalculatedOutputValue: item.CalculatedOutputValue,
+      UnitPrice: item.UnitPrice,
+      TotalPrice: item.TotalPrice,
+      DiscountPrice: item.DiscountPrice ?? 0,
+      DiscountPercent: item.DiscountPercent ?? 0,
+      PurchaseUnitPrice: item.PurchaseUnitPrice,
+      PurchaseTotalPrice: item.PurchaseTotalPrice,
+      TaxPercent: item.TaxPercent ?? 0,
+      TaxPrice: item.TaxPrice ?? 0,
+      SaleUnitPrice: item.SaleUnitPrice,
+      MeasureUnit_ID: item.MeasureUnit_ID,
+      Main_MeasureUnit_ID: item.Main_MeasureUnit_ID,
+      Fix_DiscountType_ID: item.Fix_DiscountType_ID ?? 2,
+    })),
+  });
+
+  await tx.siteOrderWorkflow.updateMany({
+    where: { OrderH_ID: order.RowID, Status: 3 },
+    data: { Status: 4, UpdatedAt: new Date() },
+  });
+
+  return { whDocHId: whDocH.RowID, whDocD: created.count };
 }
 
 export async function createOrderDelivery(
@@ -1055,98 +1190,17 @@ async function createOrderInternal(
             ),
         });
 
-        const whDocH = await tx.whDocH.create({
+        await tx.siteOrderWorkflow.create({
           data: {
-            DocNo: docNoWhdocH,
-            UniqueCode: randomUUID(),
-            Person_ID: customer.RowID,
-            MDate: new Date(),
-            FDate: getJalaliDate(),
-            FDateInsert: getJalaliDate(),
-            FTimeInsert: getCurrentTime(),
-            TotalPrice: totalPrice,
-            FinancialYear_ID: financialYearId,
-            TotalDiscountPriceItems: 0,
-            TotalTaxPriceItems: 0,
-            TotalIncreasePrice: 1,
-            TotalDecreasePrice: 0,
-            Branch_ID: branchId,
-            DiscountPercent: 0,
-            DiscountPrice: discountPrice,
-            TaxPercent: 0,
-            TaxPrice: taxPrice,
-            PayablePrice: payablePrice,
-            Fix_DiscountType_ID: 1,
-            Fix_RecordStatusType_ID: 1,
-            Fix_WhDocType1_ID: 1,
-            Fix_WhDocType2_ID: 1,
-            Warehouse_ID: warehouseId,
-            RowDesc: "RowDesc" in data.deliveryAddress
-              ? data.deliveryAddress.RowDesc
-              : undefined,
-            RowUpdateVersion:1,
             OrderH_ID: orderH.RowID,
-         },
-         select:{
-          RowID: true
-         }
-        })
-
-        const whDocD = await tx.whDocD.createMany({
-          data:  orderItems.map(
-              (item) => ({
-                Branch_ID:
-                  branchId,
-
-                FinancialYear_ID:
-                  financialYearId,
-
-                WhDocH_ID:
-                  whDocH.RowID,
-
-                Good_ID:
-                  item.goodId,
-
-                InputValue:
-                  0,
-
-                CalculatedInputValue:
-                  0,
-
-                OutputValue:
-                  item.quantity,
-
-                CalculatedOutputValue:
-                  item.quantity,
-
-                UnitPrice:
-                  item.unitPrice,
-
-                TotalPrice:
-                  item.totalPrice,
-                DiscountPrice: 0,
-                DiscountPercent:0,
-                PurchaseUnitPrice: item.unitPrice,
-                PurchaseTotalPrice: item.totalPrice,
-                TaxPercent:0,
-                TaxPrice: 0,
-                SaleUnitPrice: item.unitPrice,
-                MeasureUnit_ID : item.defaultMeasureUnitId,
-                Main_MeasureUnit_ID : item.mainMeasureUnitId,
-                Fix_DiscountType_ID:2
-
-              }),
-            ),
-        })
+            Status: 1,
+          },
+        });
 
         return {
 
-          whDocHId:
-            Number(
-              whDocH.RowID,
-            ),
-
-          whDocD: whDocD.count,
+          whDocHId: null,
+          whDocD: 0,
 
           orderHId:
             Number(
@@ -1214,40 +1268,15 @@ async function findOrderByIdempotencyKey(
     return null;
   }
 
-  const warehouseDocument = await prisma.whDocH.findFirst({
-    where: {
-      OrderH_ID: existingOrder.RowID,
-    },
-    select: {
-      RowID: true,
-    },
+  const orderD = await prisma.orderD.count({
+    where: { OrderH_ID: existingOrder.RowID },
   });
-
-  if (!warehouseDocument) {
-    throw new Error(
-      "سفارش قبلی پیدا شد اما سند انبار مرتبط با آن موجود نیست.",
-    );
-  }
-
-  const [orderD, whDocD] = await Promise.all([
-    prisma.orderD.count({
-      where: {
-        OrderH_ID: existingOrder.RowID,
-      },
-    }),
-
-    prisma.whDocD.count({
-      where: {
-        WhDocH_ID: warehouseDocument.RowID,
-      },
-    }),
-  ]);
 
   return {
     orderHId: Number(existingOrder.RowID),
-    whDocHId: warehouseDocument.RowID,
+    whDocHId: null,
     orderD,
-    whDocD,
+    whDocD: 0,
     docNo: Number(existingOrder.DocNo),
     personId: existingOrder.Person_ID!,
     deliveryAddressId: Number(

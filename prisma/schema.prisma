@@ -616,6 +616,7 @@ model OrderH {
   OrderHInvoiceIncrease                                             OrderHInvoiceIncrease[]
   WhDocH                                                            WhDocH[]
   WhDocHEdited                                                      WhDocHEdited[]
+  SiteOrderWorkflow                                                 SiteOrderWorkflow?
 
   @@unique([DocNo, FinancialYear_ID], map: "UQ_OrderH_DocNo")
   @@map("OrderH")
@@ -687,6 +688,23 @@ model SiteOrderRequest {
   @@index([OrderH_ID, Person_ID, CreatedAt], map: "IX_SiteOrderRequest_Order_Person")
   @@index([Status, CreatedAt], map: "IX_SiteOrderRequest_Status_CreatedAt")
   @@map("SiteOrderRequest")
+  @@schema("dbo")
+}
+
+model SiteOrderWorkflow {
+  OrderH_ID          BigInt   @id
+  Status             Int      @default(1) @db.TinyInt
+  ShippingCost       Float?   @db.Money
+  AdminNote          String?  @db.NVarChar(500)
+  QuoteExpiresAt     DateTime? @db.DateTime
+  CustomerAcceptedAt DateTime? @db.DateTime
+  CustomerRejectedAt DateTime? @db.DateTime
+  CreatedAt          DateTime @default(now()) @db.DateTime
+  UpdatedAt          DateTime? @db.DateTime
+  OrderH             OrderH   @relation(fields: [OrderH_ID], references: [RowID], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([Status, CreatedAt], map: "IX_SiteOrderWorkflow_Status_CreatedAt")
+  @@map("SiteOrderWorkflow")
   @@schema("dbo")
 }
 

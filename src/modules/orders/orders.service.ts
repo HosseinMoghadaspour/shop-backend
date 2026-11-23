@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
-import { resolveProductPricing } from "../pricing/price.service.js";
+import { resolveProductsPricing } from "../pricing/price.service.js";
 
 import type {
   CartItem,
@@ -793,8 +793,8 @@ async function createOrderInternal(
     );
 
 
-  const orderItems: OrderItemResponse[] =
-    [];
+  const pricingByGoodId = await resolveProductsPricing(goods, { branchId: data.branchId });
+  const orderItems: OrderItemResponse[] = [];
 
   let totalPrice = 0;
 
@@ -831,7 +831,7 @@ async function createOrderInternal(
 );
 
 
-    const pricing = await resolveProductPricing(good);
+    const pricing = pricingByGoodId.get(good.RowID)!;
     const unitPrice = pricing.finalPrice;
 
     if (

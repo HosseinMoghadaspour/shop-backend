@@ -36,11 +36,7 @@ export async function setAdminShippingQuote(
       Number(order.TaxPrice ?? 0) +
       shippingCost;
 
-    await tx.orderH.update({
-      where: { RowID: orderId },
-      data: { ShippingCost: shippingCost, PayablePrice: payablePrice },
-    });
-    await tx.siteOrderWorkflow.updateMany({
+    const changed = await tx.siteOrderWorkflow.updateMany({
       where: { OrderH_ID: orderId, Status: ORDER_WORKFLOW_STATUS.WAITING_SHIPPING_QUOTE },
       data: {
         Status: ORDER_WORKFLOW_STATUS.WAITING_CUSTOMER_CONFIRMATION,
@@ -49,6 +45,12 @@ export async function setAdminShippingQuote(
         QuoteExpiresAt: expiresAt ?? null,
         UpdatedAt: new Date(),
       },
+    });
+    if (changed.count !== 1) return { kind: "invalid-status" as const };
+
+    await tx.orderH.update({
+      where: { RowID: orderId },
+      data: { ShippingCost: shippingCost, PayablePrice: payablePrice },
     });
     return { kind: "updated" as const, payablePrice };
   });
@@ -60,6 +62,12 @@ export async function confirmCustomerOrderTotal(
   accepted: boolean,
 ) {
   return prisma.$transaction(async (tx) => {
+    const ownedOrder = await tx.orderH.findFirst({
+      where: { RowID: orderId, Person_ID: personId, IsOnlineOrder: true },
+      select: { RowID: true },
+    });
+    if (!ownedOrder) return { kind: "not-found" as const };
+
     const workflow = await tx.siteOrderWorkflow.findUnique({
       where: { OrderH_ID: orderId },
       select: { Status: true, QuoteExpiresAt: true },
@@ -71,11 +79,6 @@ export async function confirmCustomerOrderTotal(
     if (workflow.QuoteExpiresAt && workflow.QuoteExpiresAt.getTime() < Date.now()) {
       return { kind: "expired" as const };
     }
-    const ownedOrder = await tx.orderH.findFirst({
-      where: { RowID: orderId, Person_ID: personId, IsOnlineOrder: true },
-      select: { RowID: true },
-    });
-    if (!ownedOrder) return { kind: "not-found" as const };
 
     const updated = await tx.siteOrderWorkflow.updateMany({
       where: {

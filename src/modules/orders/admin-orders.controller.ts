@@ -63,5 +63,6 @@ export async function changeAdminOrderStatuses(c: Context) {
   if (result.kind === "invalid-delivery-status") return c.json({ success: false, message: "وضعیت ارسال انتخاب‌شده معتبر نیست." }, 400);
   if (result.kind === "invalid-send-status") return c.json({ success: false, message: "مرحله انتخاب‌شده در جدول Fix_OrderSendMethod وجود ندارد." }, 400);
   if (result.kind === "invalid-payment-status") return c.json({ success: false, message: "وضعیت پرداخت انتخاب‌شده معتبر نیست." }, 400);
+  if (result.kind === "payment-requires-verification") return c.json({ success: false, message: "تغییر مستقیم وضعیت به پرداخت‌شده مجاز نیست؛ رسید یا تراکنش باید از مسیر تأیید پرداخت بررسی شود." }, 409);
   return c.json({ success: true, message: "وضعیت سفارش به‌روزرسانی شد." });
 }
